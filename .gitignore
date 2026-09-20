@@ -1,0 +1,16 @@
+# 빌드 산출물
+build/
+out/
+.gradle/
+
+# 로컬 캐시 (원본은 외부 소스에서 받아온다)
+data/cache/
+
+# 자격
+*.key
+.env
+
+# IDE
+.idea/
+*.iml
+.vscode/
