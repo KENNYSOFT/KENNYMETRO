@@ -1,0 +1,31 @@
+spring:
+  application:
+    name: kennymetro
+  threads:
+    virtual:
+      enabled: true
+
+server:
+  port: 8080
+  shutdown: graceful
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+
+logging:
+  level:
+    kr.kennysoft.kennymetro: INFO
+
+seoul-subway:
+  # 실시간 지하철 전용 인증키(일반 인증키와 별도로 신청한다). 기본값을 두지 않아
+  # 미주입 시 기동이 실패한다.
+  api-key: ${SEOUL_SUBWAY_API_KEY}
+  base-url: http://swopenapi.seoul.go.kr/api/subway
+  # 하루 1,000회 제한이라 운행시간 19시간을 나누면 70초에 1회다. 활용사례 갤러리에
+  # 등록해 제한이 풀리면 줄일 수 있다.
+  cache-ttl: 70s
+  # 응답이 늦어도 이 시간을 넘기면 캐시된 값으로 답한다.
+  request-timeout: 5s
