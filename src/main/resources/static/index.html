@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>신분당선 실시간</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --fg: #1a1a1a;
+    --muted: #6b7280;
+    --rail: #d4d4d8;
+    --line: #bb1833;
+    --card: #f4f4f5;
+    --warn-bg: #fff4e5;
+    --warn-fg: #9a3412;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #111113;
+      --fg: #f4f4f5;
+      --muted: #9ca3af;
+      --rail: #3f3f46;
+      --card: #1e1e21;
+      --warn-bg: #3b2410;
+      --warn-fg: #fdba74;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 16px 16px 40px;
+    background: var(--bg);
+    color: var(--fg);
+    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", "Malgun Gothic", sans-serif;
+    -webkit-text-size-adjust: 100%;
+  }
+  header { display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; }
+  h1 { font-size: 20px; margin: 0; }
+  h1::before {
+    content: ""; display: inline-block; width: 10px; height: 10px;
+    border-radius: 50%; background: var(--line); margin-right: 7px; vertical-align: middle;
+  }
+  #status { font-size: 12px; color: var(--muted); }
+  .legend { font-size: 12px; color: var(--muted); margin: 10px 0 14px; }
+  .legend b { color: var(--warn-fg); background: var(--warn-bg); padding: 1px 5px; border-radius: 4px; font-weight: 600; }
+
+  .rail { position: relative; }
+  .rail::before {
+    content: ""; position: absolute; left: 50%; top: 10px; bottom: 10px;
+    width: 2px; margin-left: -1px; background: var(--rail);
+  }
+  .stop { display: grid; grid-template-columns: 1fr 96px 1fr; align-items: center; min-height: 40px; }
+  /* 레일 선이 역 이름 뒤로 지나간다. 이름에 배경을 깔아 선을 끊어 보이게 한다. */
+  .name { text-align: center; font-size: 13px; }
+  .name span { background: var(--bg); padding: 2px 6px; border-radius: 4px; }
+  .lane { display: flex; gap: 6px; flex-wrap: wrap; min-height: 26px; align-items: center; }
+  .lane.up { justify-content: flex-end; }
+  .lane.down { justify-content: flex-start; }
+
+  .train {
+    background: var(--card); border-radius: 6px; padding: 3px 8px;
+    font-size: 12px; white-space: nowrap; line-height: 1.35;
+  }
+  .train.short { background: var(--warn-bg); color: var(--warn-fg); font-weight: 600; }
+  .train .no { color: var(--muted); font-size: 11px; margin-left: 4px; }
+  .train.last::after { content: " 막차"; font-size: 11px; color: var(--warn-fg); }
+
+  footer { margin-top: 24px; font-size: 12px; color: var(--muted); }
+  footer a { color: inherit; }
+</style>
+</head>
+<body>
+<header>
+  <h1>신분당선</h1>
+  <span id="status">불러오는 중</span>
+</header>
+<p class="legend">
+  왼쪽이 신사 방면, 오른쪽이 광교 방면입니다. <b>정자행</b>처럼 노선 끝까지 가지 않는 열차는 따로 표시합니다.
+</p>
+
+<div class="rail" id="rail"></div>
+
+<footer>
+  자료: 서울시 실시간 지하철 정보.
+  <span id="budget"></span>
+</footer>
+
+<script>
+const SLUG = 'shinbundang';
+const REFRESH_MS = 30000;
+let stations = [];
+
+function el(tag, cls, text) {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text !== undefined) n.textContent = text;
+  return n;
+}
+
+function buildRail(names) {
+  const rail = document.getElementById('rail');
+  rail.replaceChildren();
+  names.forEach((name, i) => {
+    const stop = el('div', 'stop');
+    stop.appendChild(el('div', 'lane up', ''));
+    const label = el('div', 'name');
+    label.appendChild(el('span', null, name));
+    stop.appendChild(label);
+    stop.appendChild(el('div', 'lane down', ''));
+    stop.dataset.index = String(i);
+    rail.appendChild(stop);
+  });
+}
+
+function placeTrains(trains) {
+  document.querySelectorAll('.lane').forEach(l => l.replaceChildren());
+  for (const t of trains) {
+    const idx = stations.indexOf(t.currentStation);
+    if (idx < 0) continue;
+    const stop = document.querySelector(`.stop[data-index="${idx}"]`);
+    if (!stop) continue;
+    const lane = stop.querySelector(t.direction === 'UP' ? '.lane.up' : '.lane.down');
+    const chip = el('div', 'train' + (t.isShortTurn ? ' short' : '') + (t.isLastTrain ? ' last' : ''));
+    chip.appendChild(document.createTextNode(t.destination + '행'));
+    const no = el('span', 'no', t.trainNo);
+    chip.appendChild(no);
+    lane.appendChild(chip);
+  }
+}
+
+function describeAge(iso) {
+  if (!iso) return '아직 받지 못했습니다';
+  const sec = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000));
+  if (sec < 60) return sec + '초 전 기준';
+  return Math.floor(sec / 60) + '분 전 기준';
+}
+
+async function load() {
+  const status = document.getElementById('status');
+  try {
+    const res = await fetch(`/api/lines/${SLUG}/trains`, { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    if (stations.length === 0) {
+      stations = data.stations;
+      buildRail(stations);
+    }
+    placeTrains(data.trains);
+    status.textContent = `열차 ${data.trains.length}대 / ${describeAge(data.fetchedAt)}`;
+  } catch (e) {
+    status.textContent = '불러오지 못했습니다';
+  }
+}
+
+load();
+setInterval(load, REFRESH_MS);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') load();
+});
+</script>
+</body>
+</html>
