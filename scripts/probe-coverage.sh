@@ -13,8 +13,9 @@ set -euo pipefail
 BASE="http://swopenapi.seoul.go.kr/api/subway/${SEOUL_SUBWAY_KEY}/json"
 CALLS=0
 
-# 확인할 노선. 앞의 둘이 목적이고 나머지는 대조군 겸 환승 대상이다.
-LINES=("신분당선" "수인분당선" "경강선" "2호선" "3호선" "경의중앙선")
+# 화면에 올릴 노선. 서로 대조군이 되므로 한 번에 돌린다. 한 노선만 0 이면 그 노선이
+# API 에 없는 것이고, 전부 0 이면 그냥 운행 시간대가 아니다.
+LINES=("신분당선" "2호선" "9호선" "수인분당선")
 
 urlencode() {
   local s="$1" i c out=""

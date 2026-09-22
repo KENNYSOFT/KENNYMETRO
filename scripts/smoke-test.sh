@@ -14,6 +14,7 @@ STUB_PORT="${STUB_PORT:-18090}"
 BASE="http://127.0.0.1:$PORT"
 LOG=$(mktemp)
 STUB_LOG=$(mktemp)
+FAVICON=$(mktemp)
 
 cleanup() {
   status=$?
@@ -29,7 +30,7 @@ cleanup() {
     echo "--- stub 로그 ---" >&2
     cat "$STUB_LOG" >&2
   fi
-  rm -f "$LOG" "$STUB_LOG"
+  rm -f "$LOG" "$STUB_LOG" "$FAVICON"
 }
 trap cleanup EXIT
 
@@ -91,6 +92,21 @@ echo "$TRANSFERS" | grep -q '"stations":\[\]' && fail "환승 데이터가 비�
 echo "$TRANSFERS" | grep -q '"car":6,"door":4' || fail "환승 문 위치가 응답에 없다: $TRANSFERS"
 # 출처 표기는 CC BY 조건이라 화면에서 뺄 수 없다.
 echo "$TRANSFERS" | grep -q '"license":"CC BY-NC-SA 2.0 KR"' || fail "라이선스 표기가 빠졌다: $TRANSFERS"
+
+# 노선 목록. lines.yml 이 native image 에 실리지 않으면 여기가 빈다.
+LINES=$(curl -sf "$BASE/api/lines") || fail "노선 목록을 받지 못했다"
+echo "$LINES" | grep -q '"lines":\[\]' && fail "노선이 비었다. lines.yml 이 native image 에 실리지 않았다"
+for slug in shinbundang line2 line9 suinbundang everline; do
+  echo "$LINES" | grep -q "\"slug\":\"$slug\"" || fail "$slug 노선이 목록에 없다: $LINES"
+done
+# 편성 차수는 신분당선에만 있다. 이 값이 빠지면 화면에서 색 구분이 통째로 사라진다.
+echo "$LINES" | grep -q '"generations":\[' || fail "편성 차수가 응답에 없다: $LINES"
+
+# favicon 은 XML 이라 주석에 붙임표 두 개만 들어가도 브라우저가 렌더링을 거부한다.
+# 인라인으로 넣어 보면 HTML 파서가 관대해서 그냥 지나가므로 파일 그대로 파싱해 본다.
+curl -sf "$BASE/favicon.svg" -o "$FAVICON" || fail "favicon 을 받지 못했다"
+python3 -c 'import sys, xml.etree.ElementTree as ET; ET.parse(sys.argv[1])' "$FAVICON" \
+  || fail "favicon.svg 가 XML 로 파싱되지 않는다"
 echo "  통과"
 
 stop_all
@@ -103,7 +119,7 @@ start_app
 
 BODY=$(curl -sf "$BASE/api/lines/shinbundang/trains") || fail "빈 목록 응답이 실패했다 (native 직렬화 확인)"
 echo "$BODY" | grep -q '"trains":\[\]' || fail "빈 목록이 아니다: $BODY"
-echo "$BODY" | grep -q '"stations":\[' || fail "역 목록이 빠졌다: $BODY"
+echo "$BODY" | grep -q '"line":"shinbundang"' || fail "노선 표시가 빠졌다: $BODY"
 echo "  통과"
 
 echo "스모크 테스트 통과"

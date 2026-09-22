@@ -1,6 +1,6 @@
 package kr.kennysoft.kennymetro.web
 
-import kr.kennysoft.kennymetro.domain.Line
+import kr.kennysoft.kennymetro.domain.LineCatalog
 import kr.kennysoft.kennymetro.domain.Train
 import kr.kennysoft.kennymetro.seoul.TrainPositionService
 import org.springframework.http.HttpStatus
@@ -10,27 +10,38 @@ import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.server.ResponseStatusException
 import java.time.Instant
 
+/**
+ * 한 노선의 실시간 열차 위치.
+ *
+ * <p>
+ * 화면이 이것만 되풀이해 부르므로 역 목록 같은 고정값은 담지 않는다. 그것은 `/api/lines`
+ * 가 한 번에 준다.
+ */
 @RestController
-class TrainController(private val trainPositionService: TrainPositionService) {
+class TrainController(
+    private val catalog: LineCatalog,
+    private val trainPositionService: TrainPositionService,
+) {
 
     @GetMapping("/api/lines/{slug}/trains")
     fun trains(@PathVariable slug: String): TrainsResponse {
-        val line = Line.bySlug(slug) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "모르는 노선이다: $slug")
+        val line = catalog.bySlug(slug)
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "모르는 노선이다: $slug")
         val snapshot = trainPositionService.snapshot(line)
         // 운행이 끝나면 열차 목록이 빈다. Kotlin 의 빈 리스트는 EmptyList 싱글톤이라 native
         // image 에서 Jackson 직렬화가 깨지므로, 응답에 담기 전에 ArrayList 로 옮긴다.
         return TrainsResponse(
-            line = line.lineName,
-            stations = line.stations,
+            line = line.slug,
             fetchedAt = snapshot.fetchedAt,
             trains = ArrayList(snapshot.trains),
+            apiCallCount = trainPositionService.apiCallCount(),
         )
     }
 }
 
 data class TrainsResponse(
     val line: String,
-    val stations: List<String>,
     val fetchedAt: Instant?,
     val trains: List<Train>,
+    val apiCallCount: Long,
 )

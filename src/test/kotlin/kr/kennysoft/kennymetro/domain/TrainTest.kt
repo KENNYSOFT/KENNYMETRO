@@ -1,5 +1,6 @@
 package kr.kennysoft.kennymetro.domain
 
+import kr.kennysoft.kennymetro.TestLines
 import kr.kennysoft.kennymetro.seoul.TrainPositionDto
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -14,7 +15,7 @@ class TrainTest {
         val dto = position(current = "정자", terminal = "정자", updnLine = "1")
 
         // when
-        val train = dto.toTrain(Line.SHINBUNDANG)
+        val train = dto.toTrain(TestLines.shinbundang)
 
         // then
         assertNull(train)
@@ -27,8 +28,8 @@ class TrainTest {
         val toGwanggyo = position(current = "청계산입구", terminal = "광교", updnLine = "1")
 
         // when & then
-        assertEquals(Direction.UP, toSinsa.toTrain(Line.SHINBUNDANG)?.direction)
-        assertEquals(Direction.DOWN, toGwanggyo.toTrain(Line.SHINBUNDANG)?.direction)
+        assertEquals(Direction.UP, toSinsa.toTrain(TestLines.shinbundang)?.direction)
+        assertEquals(Direction.DOWN, toGwanggyo.toTrain(TestLines.shinbundang)?.direction)
     }
 
     @Test
@@ -37,7 +38,7 @@ class TrainTest {
         val dto = position(current = "광교", terminal = "신사", updnLine = "1")
 
         // when
-        val train = dto.toTrain(Line.SHINBUNDANG)
+        val train = dto.toTrain(TestLines.shinbundang)
 
         // then - updnLine 을 믿었다면 DOWN 이 되어 반대로 그려진다.
         assertEquals(Direction.UP, train?.direction)
@@ -50,8 +51,8 @@ class TrainTest {
         val full = position(current = "강남", terminal = "광교", updnLine = "1")
 
         // when & then
-        assertTrue(shortTurn.toTrain(Line.SHINBUNDANG)!!.isShortTurn)
-        assertTrue(!full.toTrain(Line.SHINBUNDANG)!!.isShortTurn)
+        assertTrue(shortTurn.toTrain(TestLines.shinbundang)!!.isShortTurn)
+        assertTrue(!full.toTrain(TestLines.shinbundang)!!.isShortTurn)
     }
 
     @Test
@@ -60,7 +61,7 @@ class TrainTest {
         val dto = position(current = "없는역", terminal = "광교", updnLine = "1")
 
         // when & then
-        assertNull(dto.toTrain(Line.SHINBUNDANG))
+        assertNull(dto.toTrain(TestLines.shinbundang))
     }
 
     @Test
@@ -69,7 +70,7 @@ class TrainTest {
         val dto = position(current = "판교", terminal = "광교", updnLine = "1", lstcarAt = "1", directAt = "1")
 
         // when
-        val train = dto.toTrain(Line.SHINBUNDANG)!!
+        val train = dto.toTrain(TestLines.shinbundang)!!
 
         // then
         assertTrue(train.isLastTrain)

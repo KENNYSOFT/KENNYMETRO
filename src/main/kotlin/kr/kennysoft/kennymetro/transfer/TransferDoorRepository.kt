@@ -1,6 +1,7 @@
 package kr.kennysoft.kennymetro.transfer
 
 import kr.kennysoft.kennymetro.domain.Line
+import kr.kennysoft.kennymetro.domain.LineCatalog
 import kr.kennysoft.kennymetro.domain.StationTransfer
 import kr.kennysoft.kennymetro.domain.TransferDoor
 import org.springframework.core.io.ClassPathResource
@@ -19,15 +20,15 @@ import org.springframework.stereotype.Component
  * `scripts/smoke-test.sh` 가 실제 바이너리로 왕복해 확인한다.
  */
 @Component
-class TransferDoorRepository {
+class TransferDoorRepository(catalog: LineCatalog) {
 
-    private val byLine: Map<Line, List<StationTransfer>> = Line.entries.associateWith(::load)
+    private val byLine: Map<String, List<StationTransfer>> = catalog.all().associate { it.slug to load(it) }
 
     /** 그 노선의 환승역 정보. 역 순서대로 온다. */
-    fun findByLine(line: Line): List<StationTransfer> = byLine[line].orEmpty()
+    fun findByLine(line: Line): List<StationTransfer> = byLine[line.slug].orEmpty()
 
     private fun load(line: Line): List<StationTransfer> {
-        val slug = line.name.lowercase()
+        val slug = line.slug
         val notes = loadNotes("transfer/$slug-notes.csv")
         val doors = loadDoors("transfer/$slug-doors.csv", line)
 
@@ -35,7 +36,7 @@ class TransferDoorRepository {
         // 화면 순서이므로 어긋난 것을 알려주는 편이 낫다.
         val indexes = doors.keys.map { line.indexOf(it)!! }
         require(indexes == indexes.sorted()) {
-            "transfer/$slug-doors.csv 의 역을 ${line.lineName} 순서대로 적어야 한다: ${doors.keys}"
+            "transfer/$slug-doors.csv 의 역을 ${line.name} 순서대로 적어야 한다: ${doors.keys}"
         }
 
         return doors.map { (station, stationDoors) ->
@@ -51,7 +52,7 @@ class TransferDoorRepository {
                 "$path:$lineNo 컬럼이 ${DOOR_COLUMNS}개여야 한다: $columns"
             }
             val station = columns[0]
-            require(line.indexOf(station) != null) { "$path:$lineNo ${line.lineName}에 없는 역이다: $station" }
+            require(line.indexOf(station) != null) { "$path:$lineNo ${line.name}에 없는 역이다: $station" }
             result.getOrPut(station) { mutableListOf() } += TransferDoor(
                 trainDirection = columns[1].ifBlank { null },
                 targetLine = columns[2],

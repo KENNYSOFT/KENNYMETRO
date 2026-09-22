@@ -1,6 +1,6 @@
 package kr.kennysoft.kennymetro.web
 
-import kr.kennysoft.kennymetro.domain.Line
+import kr.kennysoft.kennymetro.domain.LineCatalog
 import kr.kennysoft.kennymetro.domain.StationTransfer
 import kr.kennysoft.kennymetro.transfer.TransferDoorRepository
 import org.springframework.http.HttpStatus
@@ -13,15 +13,19 @@ import org.springframework.web.server.ResponseStatusException
  * 환승 문 위치. 데이터가 정적이라 열차 위치와 달리 캐시 만료가 없다.
  */
 @RestController
-class TransferController(private val repository: TransferDoorRepository) {
+class TransferController(
+    private val catalog: LineCatalog,
+    private val repository: TransferDoorRepository,
+) {
 
     @GetMapping("/api/lines/{slug}/transfers")
     fun transfers(@PathVariable slug: String): TransfersResponse {
-        val line = Line.bySlug(slug) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "모르는 노선이다: $slug")
+        val line = catalog.bySlug(slug)
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "모르는 노선이다: $slug")
         // 노선에 환승 데이터가 아직 없으면 빈 목록이 된다. Kotlin 의 빈 리스트는 EmptyList
         // 싱글톤이라 native image 에서 직렬화가 깨지므로 ArrayList 로 옮긴다 (DESIGN.md 4.1).
         return TransfersResponse(
-            line = line.lineName,
+            line = line.name,
             source = SOURCE,
             license = LICENSE,
             licenseUrl = LICENSE_URL,

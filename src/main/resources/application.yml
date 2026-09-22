@@ -1,6 +1,9 @@
 spring:
   application:
     name: kennymetro
+  # 노선 정의는 역 목록이 175개라 파일을 나눴다.
+  config:
+    import: classpath:lines.yml
   threads:
     virtual:
       enabled: true
@@ -31,4 +34,11 @@ seoul-subway:
   # 등록해 제한이 풀리면 줄일 수 있다.
   cache-ttl: 70s
   # 응답이 늦어도 이 시간을 넘기면 캐시된 값으로 답한다.
+  request-timeout: 5s
+  # 화면에 남은 예산을 보여주는 데만 쓴다. 이 값을 넘겨도 서버가 호출을 막지는 않는다.
+  daily-call-budget: 1000
+
+# 용인경전철. 인증이 없고 호출 제한도 공지되어 있지 않아 위 예산에 들지 않는다.
+everline:
+  base-url: https://everlinecu.com
   request-timeout: 5s

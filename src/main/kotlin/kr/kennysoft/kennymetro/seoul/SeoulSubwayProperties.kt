@@ -15,4 +15,6 @@ data class SeoulSubwayProperties(
     val baseUrl: String,
     val cacheTtl: Duration,
     val requestTimeout: Duration,
+    /** 화면에 남은 예산을 보여주는 데만 쓴다. 서버가 이 값으로 호출을 막지는 않는다. */
+    val dailyCallBudget: Int,
 )

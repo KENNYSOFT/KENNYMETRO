@@ -1,8 +1,11 @@
 package kr.kennysoft.kennymetro.seoul
 
 import kr.kennysoft.kennymetro.domain.Line
+import kr.kennysoft.kennymetro.domain.LineSource
 import kr.kennysoft.kennymetro.domain.Train
 import kr.kennysoft.kennymetro.domain.toTrain
+import kr.kennysoft.kennymetro.everline.EverlineClient
+import kr.kennysoft.kennymetro.everline.toTrain
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import java.time.Clock
@@ -18,23 +21,28 @@ import java.util.concurrent.locks.ReentrantLock
  * 몇 분 만에 마르므로, 노선당 한 벌만 받아 모든 방문자가 나눠 본다. 캐시가 낡았을
  * 때 이미 다른 요청이 받아오는 중이면 기다리지 않고 직전 값을 준다 - 같은 노선을
  * 동시에 두 번 부르지 않기 위한 것이다.
+ * <p>
+ * <b>예산은 노선 수만큼 나뉜다.</b> 화면이 다섯 노선을 한꺼번에 폴링하면 한 노선일
+ * 때의 다섯 배가 나간다. 그래서 화면은 펼친 노선만 요청하고, 서버는 나간 호출 수를
+ * 세어 응답에 실어 보낸다. 용인경전철은 다른 엔드포인트라 이 예산에 들지 않는다.
  */
 @Service
 class TrainPositionService(
-    private val client: SeoulSubwayClient,
+    private val seoulClient: SeoulSubwayClient,
+    private val everlineClient: EverlineClient,
     private val properties: SeoulSubwayProperties,
     private val clock: Clock = Clock.systemDefaultZone(),
 ) {
 
     private val log = LoggerFactory.getLogger(javaClass)
-    private val entries = ConcurrentHashMap<Line, CacheEntry>()
-    private val apiCallCount = AtomicLong()
+    private val entries = ConcurrentHashMap<String, CacheEntry>()
+    private val seoulApiCallCount = AtomicLong()
 
-    /** 지금까지 실제로 나간 API 호출 수. 일일 예산을 얼마나 썼는지 본다. */
-    fun apiCallCount(): Long = apiCallCount.get()
+    /** 지금까지 서울시 API 로 실제로 나간 호출 수. 일일 예산을 얼마나 썼는지 본다. */
+    fun apiCallCount(): Long = seoulApiCallCount.get()
 
     fun snapshot(line: Line): TrainsSnapshot {
-        val entry = entries.computeIfAbsent(line) { CacheEntry() }
+        val entry = entries.computeIfAbsent(line.slug) { CacheEntry() }
         val now = clock.instant()
 
         if (entry.isFresh(now, properties.cacheTtl.toMillis())) {
@@ -65,17 +73,24 @@ class TrainPositionService(
 
     private fun refresh(line: Line, entry: CacheEntry): TrainsSnapshot {
         try {
-            val dtos = client.findPositions(line.lineName)
-            apiCallCount.incrementAndGet()
-            entry.trains = dtos.mapNotNull { it.toTrain(line) }
+            entry.trains = fetch(line)
             entry.fetchedAt = clock.instant()
         } catch (e: Exception) {
-            apiCallCount.incrementAndGet()
             if (entry.fetchedAt == null) throw e
             // 직전 값이 있으면 그것을 계속 쓴다. 잠깐의 장애로 화면이 비지 않게 한다.
-            log.warn("실시간 위치 갱신 실패, 직전 값을 유지한다. line={} error={}", line.lineName, e.message, e)
+            log.warn("실시간 위치 갱신 실패, 직전 값을 유지한다. line={} error={}", line.name, e.message, e)
         }
         return entry.snapshot()
+    }
+
+    private fun fetch(line: Line): List<Train> = when (line.source) {
+        // 호출이 실패해도 예산은 깎인다. 그래서 응답을 받기 전에 센다.
+        LineSource.SEOUL -> {
+            seoulApiCallCount.incrementAndGet()
+            seoulClient.findPositions(line.name).mapNotNull { it.toTrain(line) }
+        }
+
+        LineSource.EVERLINE -> everlineClient.findPositions().mapNotNull { it.toTrain(line) }
     }
 
     private class CacheEntry {
