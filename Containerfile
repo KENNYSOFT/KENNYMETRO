@@ -14,6 +14,11 @@ ENV TZ=Asia/Seoul
 
 COPY kennymetro /app/kennymetro
 
+# 상대 경로 설정(호출 원장 `data/api-calls.log`)이 여기 기준으로 풀리게 한다.
+# `/app/data` 에 볼륨을 붙이면 재배포해도 그 날 쓴 호출 수가 이어진다. 안 붙여도
+# 컨테이너 안에 쓰고 돌아가며, 그때는 재생성마다 0 부터 다시 센다.
+WORKDIR /app
+
 # 호스트에서 httpd 가 8080, ledger-memo 가 8081 을 쓰므로 8082 로 띄운다.
 # --network=host 로 실행하면 이 값이 곧 호스트 포트다.
 EXPOSE 8082

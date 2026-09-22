@@ -489,7 +489,7 @@ function describeAge(iso) {
 function renderBudget() {
   const box = document.getElementById('budget');
   const open = lines.filter(l => isOpen(l.slug) && l.budgeted).length;
-  const parts = ['서울시 API ' + budget.apiCallCount + ' / ' + budget.apiCallBudget + '회'];
+  const parts = ['오늘 서울시 API ' + budget.apiCallCount + ' / ' + budget.apiCallBudget + '회'];
   if (open > 1) parts.push('펼친 노선이 ' + open + '개라 갱신 한 번에 ' + open + '회씩 나갑니다');
   box.textContent = parts.join('. ');
 }

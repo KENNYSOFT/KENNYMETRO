@@ -80,12 +80,16 @@ chmod 600 ~/.config/kennymetro/env
 ```sh
 #!/bin/sh
 set -e
+mkdir -p ~/.local/share/kennymetro
 podman pull ghcr.io/kennysoft/kennymetro:latest
 podman rm -f kennymetro
 podman run -d --name kennymetro --network=host --restart=always \
   --env-file ~/.config/kennymetro/env \
+  -v ~/.local/share/kennymetro:/app/data:Z \
   ghcr.io/kennysoft/kennymetro:latest
 ```
+
+**볼륨은 호출 원장(`api-calls.log`) 하나를 위한 것이다.** 날짜별로 그 날 서울시 API 에 나간 호출 수가 한 줄씩 쌓인다. 안 붙여도 앱은 뜨지만 재생성할 때마다 0 부터 다시 세어, 화면의 남은 예산이 실제 한도와 어긋난다.
 
 **`sudo` 로 실행하지 않는다.** `~/.config/kennymetro/env` 가 `/root` 쪽으로 해석되어 인증키 파일을 못 찾고, rootless podman 에서는 컨테이너도 따로 뜬다. 셋업한 사용자 그대로 실행한다.
 

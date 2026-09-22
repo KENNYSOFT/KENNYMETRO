@@ -11,7 +11,6 @@ import org.springframework.stereotype.Service
 import java.time.Clock
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.locks.ReentrantLock
 
 /**
@@ -31,15 +30,15 @@ class TrainPositionService(
     private val seoulClient: SeoulSubwayClient,
     private val everlineClient: EverlineClient,
     private val properties: SeoulSubwayProperties,
+    private val ledger: ApiCallLedger,
     private val clock: Clock = Clock.systemDefaultZone(),
 ) {
 
     private val log = LoggerFactory.getLogger(javaClass)
     private val entries = ConcurrentHashMap<String, CacheEntry>()
-    private val seoulApiCallCount = AtomicLong()
 
-    /** 지금까지 서울시 API 로 실제로 나간 호출 수. 일일 예산을 얼마나 썼는지 본다. */
-    fun apiCallCount(): Long = seoulApiCallCount.get()
+    /** 오늘 서울시 API 로 실제로 나간 호출 수. 일일 예산을 얼마나 썼는지 본다. */
+    fun apiCallCount(): Long = ledger.today()
 
     fun snapshot(line: Line): TrainsSnapshot {
         val entry = entries.computeIfAbsent(line.slug) { CacheEntry() }
@@ -86,7 +85,7 @@ class TrainPositionService(
     private fun fetch(line: Line): List<Train> = when (line.source) {
         // 호출이 실패해도 예산은 깎인다. 그래서 응답을 받기 전에 센다.
         LineSource.SEOUL -> {
-            seoulApiCallCount.incrementAndGet()
+            ledger.record()
             seoulClient.findPositions(line.name).mapNotNull { it.toTrain(line) }
         }
 

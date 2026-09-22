@@ -17,4 +17,9 @@ data class SeoulSubwayProperties(
     val requestTimeout: Duration,
     /** 화면에 남은 예산을 보여주는 데만 쓴다. 서버가 이 값으로 호출을 막지는 않는다. */
     val dailyCallBudget: Int,
+    /**
+     * 날짜별 호출 수를 남길 파일. 재배포해도 그 날 쓴 호출이 이어지도록 컨테이너 밖
+     * 볼륨에 둔다. 상대 경로면 작업 디렉터리 기준이다.
+     */
+    val callLogPath: String,
 )

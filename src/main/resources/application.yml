@@ -37,6 +37,9 @@ seoul-subway:
   request-timeout: 5s
   # 화면에 남은 예산을 보여주는 데만 쓴다. 이 값을 넘겨도 서버가 호출을 막지는 않는다.
   daily-call-budget: 1000
+  # 날짜별 호출 수를 남길 파일. 컨테이너에서는 이 경로에 볼륨을 붙여 재배포해도
+  # 그 날 쓴 호출이 이어지게 한다 (README 배포 절차). 없으면 만든다.
+  call-log-path: ${KENNYMETRO_CALL_LOG:data/api-calls.log}
 
 # 용인경전철. 인증이 없고 호출 제한도 공지되어 있지 않아 위 예산에 들지 않는다.
 everline:

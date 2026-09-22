@@ -15,6 +15,9 @@ BASE="http://127.0.0.1:$PORT"
 LOG=$(mktemp)
 STUB_LOG=$(mktemp)
 FAVICON=$(mktemp)
+# 호출 원장. 하위 디렉터리를 일부러 끼워, 없는 경로를 앱이 만들어 쓰는지까지 본다.
+LEDGER_DIR=$(mktemp -d)
+LEDGER="$LEDGER_DIR/nested/api-calls.log"
 
 cleanup() {
   status=$?
@@ -31,6 +34,7 @@ cleanup() {
     cat "$STUB_LOG" >&2
   fi
   rm -f "$LOG" "$STUB_LOG" "$FAVICON"
+  rm -rf "$LEDGER_DIR"
 }
 trap cleanup EXIT
 
@@ -54,6 +58,7 @@ start_app() {
   SERVER_PORT="$PORT" \
   SEOUL_SUBWAY_API_KEY=smoke-key \
   SEOUL_SUBWAY_BASE_URL="http://127.0.0.1:$STUB_PORT" \
+  KENNYMETRO_CALL_LOG="$LEDGER" \
     "$BINARY" > "$LOG" 2>&1 &
   APP_PID=$!
   i=0
@@ -73,6 +78,9 @@ stop_all() {
   APP_PID=""
   STUB_PID=""
 }
+
+# 2라운드에서 이어받기를 볼 때 쓴다. 그 사이 자정을 넘기면 원장의 날짜가 갈린다.
+DAY_BEFORE=$(date '+%Y-%m-%d')
 
 # 1라운드: 열차가 있는 응답. 파싱, 종착 처리 열차 제외, 회차 방향 판정까지 본다.
 echo "1라운드: 열차 있는 응답"
@@ -105,6 +113,12 @@ done
 # 편성 차수는 신분당선에만 있다. 이 값이 빠지면 화면에서 색 구분이 통째로 사라진다.
 echo "$LINES" | grep -q '"generations":\[' || fail "편성 차수가 응답에 없다: $LINES"
 
+# 호출 원장. 위 trains 요청으로 서울시 API 를 한 번 불렀으니 그 한 번이 파일에 남아야 한다.
+# 재배포해도 예산 표시가 이어지게 하는 장치라 실제로 파일이 생기는지까지 본다.
+echo "$LINES" | grep -q '"apiCallCount":1' || fail "호출 수가 응답에 없다: $LINES"
+[ -f "$LEDGER" ] || fail "호출 원장 파일이 생기지 않았다: $LEDGER"
+grep -q "^$DAY_BEFORE 1$" "$LEDGER" || fail "오늘 호출 수가 원장에 없다: $(cat "$LEDGER")"
+
 # favicon 은 XML 이라 주석에 붙임표 두 개만 들어가도 브라우저가 렌더링을 거부한다.
 # 인라인으로 넣어 보면 HTML 파서가 관대해서 그냥 지나가므로 파일 그대로 파싱해 본다.
 curl -sf "$BASE/favicon.svg" -o "$FAVICON" || fail "favicon 을 받지 못했다"
@@ -123,6 +137,14 @@ start_app
 BODY=$(curl -sf "$BASE/api/lines/shinbundang/trains") || fail "빈 목록 응답이 실패했다 (native 직렬화 확인)"
 echo "$BODY" | grep -q '"trains":\[\]' || fail "빈 목록이 아니다: $BODY"
 echo "$BODY" | grep -q '"line":"shinbundang"' || fail "노선 표시가 빠졌다: $BODY"
+
+# 앱을 껐다 켰으므로 호출 수는 1 에서 이어져 2 여야 한다. 원장을 안 읽으면 여기서 1 이 된다.
+LINES=$(curl -sf "$BASE/api/lines") || fail "노선 목록을 받지 못했다"
+if [ "$(date '+%Y-%m-%d')" = "$DAY_BEFORE" ]; then
+  echo "$LINES" | grep -q '"apiCallCount":2' || fail "재기동 후 호출 수를 이어받지 못했다: $LINES"
+else
+  echo "  자정을 넘겨 이어받기 확인은 건너뛴다"
+fi
 echo "  통과"
 
 echo "스모크 테스트 통과"
