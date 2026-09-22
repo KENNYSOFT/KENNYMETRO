@@ -87,6 +87,8 @@ podman run -d --name kennymetro --network=host --restart=always \
   ghcr.io/kennysoft/kennymetro:latest
 ```
 
+**`sudo` 로 실행하지 않는다.** `~/.config/kennymetro/env` 가 `/root` 쪽으로 해석되어 인증키 파일을 못 찾고, rootless podman 에서는 컨테이너도 따로 뜬다. 셋업한 사용자 그대로 실행한다.
+
 native 기동이 0.1초 수준이라 무중단 배포 장치는 필요 없다. Podman 은 데몬이 없어 `--restart=always` 만으로는 호스트 재부팅 후 뜨지 않으므로 `podman-restart.service` 를 한 번 켜둔다.
 
 **3. httpd VirtualHost.** 호스트 `/httpd-data/conf/` 에 추가한다. 인증서는 기존 `*.kennysoft.kr` 와일드카드를 그대로 참조해 certbot 갱신이 자동으로 반영되게 둔다.
