@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- 전동차 정면. 16px 로 줄어도 형태가 남도록 앞유리와 전조등만 남기고 덜어냈다.
+       몸체 색은 페이지의 --line(신분당선) 과 같고, 어두운 탭 배경에서 묻히지 않게
+       다크 모드에서만 한 단계 밝힌다. -->
+  <style>
+    .car { fill: #bb1833 }
+    .glass { fill: #fff }
+    @media (prefers-color-scheme: dark) {
+      .car { fill: #e04a62 }
+    }
+  </style>
+  <rect class="car" x="5" y="2" width="22" height="28" rx="7"/>
+  <rect class="glass" x="9" y="6.5" width="14" height="10" rx="3"/>
+  <rect class="glass" x="8.5" y="20.5" width="6" height="4" rx="2"/>
+  <rect class="glass" x="17.5" y="20.5" width="6" height="4" rx="2"/>
+</svg>
