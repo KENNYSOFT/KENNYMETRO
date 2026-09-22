@@ -40,6 +40,76 @@ http://localhost:8080 에서 열린다. 헬스체크는 `/actuator/health`, 열�
 
 활용사례 갤러리에 인증키와 함께 콘텐츠를 등록하면 이 제한이 풀린다.
 
+## 배포
+
+GitHub Actions 가 ARM64 runner 에서 native 바이너리를 만들고, 스모크 테스트를 통과하면 이미지를 GHCR 에 올린다. 서버는 그 이미지를 받아 컨테이너를 재생성한다. `main` push 에서만 이미지가 올라가고, 문서만 바뀐 push 는 빌드하지 않는다.
+
+**native 빌드는 크로스 컴파일이 불가능하다.** 서버가 aarch64 이므로 CI 도 ARM runner 여야 하고, x86 산출물은 서버에서 실행되지 않는다.
+
+### 최초 셋업
+
+ledger-memo 가 이미 도는 서버라 httpd 와 Podman 은 갖춰져 있다. 아래만 추가한다.
+
+**1. 인증키 파일** (권한 600). `podman run -e` 로 넘기면 shell history 와 `ps` 에 남으므로 env 파일로만 다룬다.
+
+```sh
+mkdir -p ~/.config/kennymetro
+cat > ~/.config/kennymetro/env <<'EOF'
+SEOUL_SUBWAY_API_KEY=<발급받은 키>
+SERVER_PORT=8082
+EOF
+chmod 600 ~/.config/kennymetro/env
+```
+
+**포트는 8082 다.** 같은 호스트에서 httpd 가 8080, ledger-memo 가 8081 을 쓰고 있고 `--network=host` 로 띄우므로 겹치면 기동이 실패한다.
+
+**2. 재생성 스크립트** `/usr/local/bin/deploy-kennymetro.sh`
+
+```sh
+#!/bin/sh
+set -e
+podman pull ghcr.io/kennysoft/kennymetro:latest
+podman rm -f kennymetro
+podman run -d --name kennymetro --network=host --restart=always \
+  --env-file ~/.config/kennymetro/env \
+  ghcr.io/kennysoft/kennymetro:latest
+```
+
+native 기동이 0.1초 수준이라 무중단 배포 장치는 필요 없다. Podman 은 데몬이 없어 `--restart=always` 만으로는 호스트 재부팅 후 뜨지 않으므로 `podman-restart.service` 를 한 번 켜둔다.
+
+**3. httpd VirtualHost.** 호스트 `/httpd-data/conf/` 에 추가한다. 인증서는 기존 `*.kennysoft.kr` 와일드카드를 그대로 참조해 certbot 갱신이 자동으로 반영되게 둔다.
+
+```apache
+<VirtualHost *:8443>
+    ServerName metro.kennysoft.kr
+
+    ProxyPreserveHost On
+    RequestHeader set X-Forwarded-Proto "https"
+    ProxyPass        / http://localhost:8082/
+    ProxyPassReverse / http://localhost:8082/
+
+    Protocols h2 h2c http/1.1
+    TraceEnable off
+
+    ErrorLog  /usr/local/apache2/logs/metro_error.log
+    CustomLog /usr/local/apache2/logs/metro_access.log combined
+</VirtualHost>
+```
+
+**4. 검증**은 `GET /actuator/health` 가 `UP` 인지로 한다.
+
+### 스모크 테스트
+
+CI 가 native 바이너리를 실제로 띄워 열차 목록을 왕복한다. 실제 API 는 부르지 않고 `scripts/stub-seoul-api.py` 를 쓴다 - 하루 1,000회 예산을 CI 가 깎으면 안 되고, 외부 네트워크에 의존하게 된다.
+
+**열차가 0대인 응답까지 확인하는 것이 요점이다.** Kotlin 의 빈 컬렉션은 native 에서 직렬화가 깨지는데 JVM 테스트로는 잡히지 않고, 운행이 끝나면 매일 밤 그 상태가 된다.
+
+로컬에서 돌리려면 `BINARY` 로 바이너리 경로를 준다.
+
+```sh
+BINARY=build/native/nativeCompile/kennymetro ./scripts/smoke-test.sh
+```
+
 ## 노선 커버리지 확인
 
 노선을 추가하기 전에 그 노선이 실시간 API 에 실제로 들어오는지 확인한다.
