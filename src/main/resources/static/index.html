@@ -65,7 +65,9 @@
   .fleet-chip::before {
     content: ""; width: 9px; height: 9px; border-radius: 2px; background: var(--fleet);
   }
-  .fleet-source { color: var(--muted); }
+  /* 어느 문서의 몇 번째 판에서 옮겼는지. CC BY 조건이라 화면에서 뺄 수 없다. */
+  .credits { margin-top: 10px; font-size: 11px; color: var(--muted); line-height: 1.7; }
+  .credits a { color: inherit; }
 
   .rail { position: relative; }
   .rail::before {
@@ -137,7 +139,7 @@
 <div id="lines"></div>
 
 <footer>
-  자료: 서울시 실시간 지하철 정보, 용인경전철.<span id="transfer-source"></span>
+  자료: 서울시 실시간 지하철 정보, 용인경전철. 환승 문 위치와 편성 차수의 출처는 노선마다 적었습니다.
 </footer>
 
 <script>
@@ -147,7 +149,6 @@ const STORAGE_KEY = 'kennymetro.view';
 let lines = [];
 let budget = { apiCallBudget: 0, apiCallCount: 0 };
 let transfersByLine = {};
-let transferCredit = null;
 
 // 펼친 노선과 전 구간 보기 여부는 사람마다 다르다. 서버에 계정이 없으므로 이 브라우저에만 둔다.
 let view = { open: [], full: [] };
@@ -206,7 +207,7 @@ function buildRail(line) {
     stop.appendChild(el('div', 'lane up', ''));
 
     const label = el('div', 'name');
-    const info = transfers && transfers.get(name);
+    const info = transfers && transfers.byStation.get(name);
     const panelId = 'tr-' + line.slug + '-' + i;
     const node = info ? transferToggle(name, panelId) : el('span', null, name);
     if (line.keyStations.includes(name)) node.classList.add('key');
@@ -326,6 +327,8 @@ function buildSection(line) {
   if (line.fleet) body.appendChild(buildFleetLegend(line));
   body.appendChild(buildRail(line));
   body.appendChild(buildScope(line, section));
+  const credits = buildCredits(line);
+  if (credits) body.appendChild(credits);
   section.appendChild(body);
 
   const apply = () => {
@@ -370,7 +373,46 @@ function buildFleetLegend(line) {
     chip.target = '_blank';
     box.appendChild(chip);
   }
-  box.appendChild(el('span', 'fleet-source', '출처: ' + line.fleet.sourceName));
+  return box;
+}
+
+/**
+ * 출처 표기. 노선마다 가져온 문서가 다르고, 위키는 계속 고쳐지므로 판까지 적는다.
+ * CC BY 조건이라 뺄 수 없다.
+ */
+function buildCredits(line) {
+  const transfer = transfersByLine[line.slug];
+  const items = [];
+  if (transfer && transfer.source) {
+    items.push(['환승 문 위치', transfer.source.document, transfer.source.revision, transfer.source.url]);
+  }
+  if (line.fleet) {
+    items.push(['편성 차수', line.fleet.sourceDocument, line.fleet.sourceRevision, line.fleet.sourceUrl]);
+  }
+  if (items.length === 0) return null;
+
+  const box = el('div', 'credits');
+  for (const [what, doc, rev, url] of items) {
+    const row = el('div');
+    row.appendChild(document.createTextNode(what + ': 나무위키 '));
+    const a = el('a', null, doc + ' ' + rev);
+    a.href = url;
+    a.rel = 'noopener';
+    a.target = '_blank';
+    row.appendChild(a);
+    box.appendChild(row);
+  }
+
+  const license = transfer && transfer.source ? transfer.source : null;
+  const row = el('div');
+  row.appendChild(document.createTextNode('나무위키 문서는 '));
+  const a = el('a', null, license ? license.license : 'CC BY-NC-SA 2.0 KR');
+  a.href = license ? license.licenseUrl : 'https://creativecommons.org/licenses/by-nc-sa/2.0/kr/';
+  a.rel = 'license noopener';
+  a.target = '_blank';
+  row.appendChild(a);
+  row.appendChild(document.createTextNode(' 를 따릅니다.'));
+  box.appendChild(row);
   return box;
 }
 
@@ -447,21 +489,10 @@ async function loadTransfers(line) {
   if (!res.ok) return;
   const data = await res.json();
   if (data.stations.length === 0) return;
-  transfersByLine[line.slug] = new Map(data.stations.map(s => [s.station, s]));
-  transferCredit = data;
-}
-
-/** 출처와 라이선스 표기. CC BY 조건이라 빼면 안 된다. */
-function renderTransferSource() {
-  if (!transferCredit) return;
-  const box = document.getElementById('transfer-source');
-  box.replaceChildren(document.createTextNode(' 환승 문 위치: ' + transferCredit.source + ' ('));
-  const a = el('a', null, transferCredit.license);
-  a.href = transferCredit.licenseUrl;
-  a.rel = 'license noopener';
-  a.target = '_blank';
-  box.appendChild(a);
-  box.appendChild(document.createTextNode(').'));
+  transfersByLine[line.slug] = {
+    byStation: new Map(data.stations.map(s => [s.station, s])),
+    source: data.source,
+  };
 }
 
 async function boot() {
@@ -477,7 +508,6 @@ async function boot() {
 
   // 환승 데이터는 정적이라 한 번만 받는다. 노선도를 그릴 때 필요하므로 먼저 받는다.
   await Promise.all(lines.map(l => loadTransfers(l).catch(() => {})));
-  renderTransferSource();
 
   const box = document.getElementById('lines');
   box.replaceChildren(...lines.map(buildSection));
