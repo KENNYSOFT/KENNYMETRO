@@ -2,6 +2,7 @@
 build/
 out/
 .gradle/
+__pycache__/
 
 # 로컬 캐시 (원본은 외부 소스에서 받아온다)
 data/cache/

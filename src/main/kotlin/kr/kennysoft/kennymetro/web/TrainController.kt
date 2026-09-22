@@ -17,11 +17,13 @@ class TrainController(private val trainPositionService: TrainPositionService) {
     fun trains(@PathVariable slug: String): TrainsResponse {
         val line = findLine(slug) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "모르는 노선이다: $slug")
         val snapshot = trainPositionService.snapshot(line)
+        // 운행이 끝나면 열차 목록이 빈다. Kotlin 의 빈 리스트는 EmptyList 싱글톤이라 native
+        // image 에서 Jackson 직렬화가 깨지므로, 응답에 담기 전에 ArrayList 로 옮긴다.
         return TrainsResponse(
             line = line.lineName,
             stations = line.stations,
             fetchedAt = snapshot.fetchedAt,
-            trains = snapshot.trains,
+            trains = ArrayList(snapshot.trains),
         )
     }
 
