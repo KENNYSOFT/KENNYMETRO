@@ -67,6 +67,29 @@
   .train .no { color: var(--muted); font-size: 11px; margin-left: 4px; }
   .train.last::after { content: " 막차"; font-size: 11px; color: var(--warn-fg); }
 
+  /* 환승역만 눌러서 펼칠 수 있다. 점선 밑줄이 그 표시다. */
+  .name button {
+    border: 0; background: var(--bg); font: inherit; color: inherit;
+    padding: 2px 6px; border-radius: 4px; cursor: pointer;
+    border-bottom: 1px dashed var(--muted);
+  }
+  .name button[aria-expanded="true"] { background: var(--card); }
+
+  /* 레일 세로선이 absolute 라 배경만으로는 안 가려진다.
+     폭을 풀어 두면 넓은 화면에서 문 번호가 노선명과 화면 양끝으로 갈라져 같은 줄로 안 읽힌다. */
+  .transfer {
+    position: relative; z-index: 1;
+    max-width: 520px; margin: 2px auto 10px;
+    background: var(--card); border-radius: 8px;
+    padding: 10px 12px; font-size: 12px;
+  }
+  /* 문 번호를 오른쪽 끝에 세워 세로로 훑을 수 있게 한다. */
+  .tr-row { display: flex; gap: 10px; align-items: baseline; padding: 2px 0; }
+  .tr-dir { min-width: 62px; color: var(--muted); }
+  .tr-line { flex: 1; }
+  .tr-door { font-weight: 600; color: var(--line); white-space: nowrap; }
+  .tr-note { margin: 8px 0 0; color: var(--muted); line-height: 1.5; }
+
   footer { margin-top: 24px; font-size: 12px; color: var(--muted); }
   footer a { color: inherit; }
 </style>
@@ -78,12 +101,13 @@
 </header>
 <p class="legend">
   왼쪽이 신사 방면, 오른쪽이 광교 방면입니다. <b>정자행</b>처럼 노선 끝까지 가지 않는 열차는 따로 표시합니다.
+  밑줄 친 역 이름을 누르면 빠른 환승 문 위치가 열립니다.
 </p>
 
 <div class="rail" id="rail"></div>
 
 <footer>
-  자료: 서울시 실시간 지하철 정보.
+  자료: 서울시 실시간 지하철 정보.<span id="transfer-source"></span>
   <span id="budget"></span>
 </footer>
 
@@ -91,6 +115,7 @@
 const SLUG = 'shinbundang';
 const REFRESH_MS = 30000;
 let stations = [];
+let transfers = null;
 
 function el(tag, cls, text) {
   const n = document.createElement(tag);
@@ -106,12 +131,79 @@ function buildRail(names) {
     const stop = el('div', 'stop');
     stop.appendChild(el('div', 'lane up', ''));
     const label = el('div', 'name');
-    label.appendChild(el('span', null, name));
+    const info = transfers && transfers.get(name);
+    label.appendChild(info ? transferToggle(name, 'tr-' + i) : el('span', null, name));
     stop.appendChild(label);
     stop.appendChild(el('div', 'lane down', ''));
     stop.dataset.index = String(i);
     rail.appendChild(stop);
+    if (info) rail.appendChild(buildTransferPanel('tr-' + i, info));
   });
+}
+
+function transferToggle(name, panelId) {
+  const btn = el('button', null, name);
+  btn.type = 'button';
+  btn.setAttribute('aria-expanded', 'false');
+  btn.setAttribute('aria-controls', panelId);
+  btn.addEventListener('click', () => {
+    const panel = document.getElementById(panelId);
+    const opening = panel.hidden;
+    panel.hidden = !opening;
+    btn.setAttribute('aria-expanded', String(opening));
+  });
+  return btn;
+}
+
+function buildTransferPanel(id, info) {
+  const box = el('div', 'transfer');
+  box.id = id;
+  box.hidden = true;
+  for (const g of groupDoors(info.doors)) {
+    const row = el('div', 'tr-row');
+    // 시종착역은 열차 방면을 가릴 것이 없어 이 칸이 빈다. 자리는 남겨 세로줄을 맞춘다.
+    row.appendChild(el('span', 'tr-dir', g.trainDirection ? g.trainDirection + ' 방면' : ''));
+    row.appendChild(el('span', 'tr-line', g.targetDirection ? g.targetLine + ' ' + g.targetDirection + ' 방면' : g.targetLine));
+    row.appendChild(el('span', 'tr-door', g.spots.join(', ')));
+    box.appendChild(row);
+  }
+  if (info.note) box.appendChild(el('p', 'tr-note', info.note));
+  return box;
+}
+
+/** 같은 방면, 같은 노선으로 가는 문이 여럿이면 한 줄로 합친다 (강남에서 2호선이 그렇다). */
+function groupDoors(doors) {
+  const groups = new Map();
+  for (const d of doors) {
+    const key = JSON.stringify([d.trainDirection, d.targetLine, d.targetDirection]);
+    let g = groups.get(key);
+    if (!g) {
+      g = { trainDirection: d.trainDirection, targetLine: d.targetLine, targetDirection: d.targetDirection, spots: [] };
+      groups.set(key, g);
+    }
+    g.spots.push(d.car + '-' + d.door);
+  }
+  return [...groups.values()];
+}
+
+/** 출처와 라이선스 표기. CC BY 조건이라 빼면 안 된다. */
+function renderSource(data) {
+  const box = document.getElementById('transfer-source');
+  box.replaceChildren(document.createTextNode(' 환승 문 위치: ' + data.source + ' ('));
+  const a = el('a', null, data.license);
+  a.href = data.licenseUrl;
+  a.rel = 'license noopener';
+  a.target = '_blank';
+  box.appendChild(a);
+  box.appendChild(document.createTextNode(').'));
+}
+
+async function loadTransfers() {
+  const res = await fetch(`/api/lines/${SLUG}/transfers`, { cache: 'no-store' });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const data = await res.json();
+  transfers = new Map(data.stations.map(s => [s.station, s]));
+  renderSource(data);
 }
 
 function placeTrains(trains) {
@@ -154,8 +246,12 @@ async function load() {
   }
 }
 
-load();
-setInterval(load, REFRESH_MS);
+// 환승 데이터는 정적이라 한 번만 받는다. 노선도를 그릴 때 필요하므로 열차보다 먼저 받되,
+// 실패해도 열차 위치는 떠야 하므로 여기서 끊지 않는다.
+loadTransfers().catch(() => {}).then(() => {
+  load();
+  setInterval(load, REFRESH_MS);
+});
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') load();
 });
