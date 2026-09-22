@@ -1,6 +1,7 @@
 package kr.kennysoft.kennymetro.seoul
 
 import org.slf4j.LoggerFactory
+import org.springframework.aot.hint.annotation.RegisterReflectionForBinding
 import org.springframework.http.client.JdkClientHttpRequestFactory
 import org.springframework.stereotype.Component
 import org.springframework.web.client.RestClient
@@ -11,8 +12,13 @@ import java.net.http.HttpClient
  * <p>
  * 호출 한 번이 일일 예산 1,000회를 깎으므로 이 클래스를 직접 부르지 말고
  * {@link TrainPositionService} 를 통해 캐시된 값을 쓴다.
+ * <p>
+ * 응답 DTO 는 `body(X::class.java)` 로 런타임에 지정하므로 Spring AOT 의 정적 분석에
+ * 잡히지 않는다. 컨트롤러 반환 타입과 달리 직접 등록하지 않으면 native image 에서
+ * `KotlinReflectionInternalError: Unresolved class` 로 역직렬화가 실패한다.
  */
 @Component
+@RegisterReflectionForBinding(RealtimePositionResponse::class, TrainPositionDto::class)
 class SeoulSubwayClient(private val properties: SeoulSubwayProperties) {
 
     private val log = LoggerFactory.getLogger(javaClass)
