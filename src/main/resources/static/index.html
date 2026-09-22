@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>신분당선 실시간</title>
+<title>수도권 전철 실시간</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <style>
   :root {
@@ -11,8 +11,8 @@
     --fg: #1a1a1a;
     --muted: #6b7280;
     --rail: #d4d4d8;
-    --line: #bb1833;
     --card: #f4f4f5;
+    --edge: #e4e4e7;
     --warn-bg: #fff4e5;
     --warn-fg: #9a3412;
   }
@@ -23,6 +23,7 @@
       --muted: #9ca3af;
       --rail: #3f3f46;
       --card: #1e1e21;
+      --edge: #2a2a2e;
       --warn-bg: #3b2410;
       --warn-fg: #fdba74;
     }
@@ -36,26 +37,51 @@
     font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", "Malgun Gothic", sans-serif;
     -webkit-text-size-adjust: 100%;
   }
-  header { display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; }
-  h1 { font-size: 20px; margin: 0; }
-  h1::before {
-    content: ""; display: inline-block; width: 10px; height: 10px;
-    border-radius: 50%; background: var(--line); margin-right: 7px; vertical-align: middle;
+  h1 { font-size: 19px; margin: 0 0 2px; }
+  #budget { font-size: 12px; color: var(--muted); }
+
+  /* 노선 하나가 한 덩어리다. 접으면 폴링도 멈춘다. */
+  .line { border-top: 1px solid var(--edge); padding: 12px 0 4px; }
+  .line-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .line-toggle {
+    display: flex; align-items: center; gap: 7px;
+    border: 0; background: none; color: inherit; cursor: pointer;
+    font: 600 16px/1.4 inherit; padding: 2px 0;
   }
-  #status { font-size: 12px; color: var(--muted); }
-  .legend { font-size: 12px; color: var(--muted); margin: 10px 0 14px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+  .caret { color: var(--muted); font-size: 11px; }
+  .line-status { font-size: 12px; color: var(--muted); }
+  .line-body { padding-top: 6px; }
+  .legend { font-size: 12px; color: var(--muted); margin: 0 0 10px; }
   .legend b { color: var(--warn-fg); background: var(--warn-bg); padding: 1px 5px; border-radius: 4px; font-weight: 600; }
+
+  /* 편성 차수 범례. 색이 무엇을 뜻하는지 여기서만 말한다. */
+  .fleet-legend { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; font-size: 12px; margin: 0 0 10px; }
+  .fleet-chip {
+    display: inline-flex; align-items: center; gap: 5px;
+    color: var(--muted); text-decoration: none;
+    border-bottom: 1px dashed var(--muted);
+  }
+  .fleet-chip::before {
+    content: ""; width: 9px; height: 9px; border-radius: 2px; background: var(--fleet);
+  }
+  .fleet-source { color: var(--muted); }
 
   .rail { position: relative; }
   .rail::before {
     content: ""; position: absolute; left: 50%; top: 10px; bottom: 10px;
     width: 2px; margin-left: -1px; background: var(--rail);
   }
-  .stop { display: grid; grid-template-columns: 1fr 96px 1fr; align-items: center; min-height: 40px; }
-  /* 레일 선이 역 이름 뒤로 지나간다. 이름에 배경을 깔아 선을 끊어 보이게 한다. */
+  .stop { display: grid; grid-template-columns: 1fr 104px 1fr; align-items: center; min-height: 38px; }
+  /* 레일 선이 역 이름 뒤로 지나간다. 이름에 배경을 깔아 선을 끊어 보이게 하는데,
+     선이 absolute 라 그것만으로는 글자 위에 그려진다. 쌓임 순서를 올려 덮는다. */
   .name { text-align: center; font-size: 13px; }
-  .name span { background: var(--bg); padding: 2px 6px; border-radius: 4px; }
-  .lane { display: flex; gap: 6px; flex-wrap: wrap; min-height: 26px; align-items: center; }
+  .name span, .name button {
+    position: relative; z-index: 1;
+    background: var(--bg); padding: 2px 6px; border-radius: 4px;
+  }
+  .name .key { font-weight: 700; }
+  .lane { display: flex; gap: 6px; flex-wrap: wrap; min-height: 24px; align-items: center; }
   .lane.up { justify-content: flex-end; }
   .lane.down { justify-content: flex-start; }
 
@@ -63,14 +89,22 @@
     background: var(--card); border-radius: 6px; padding: 3px 8px;
     font-size: 12px; white-space: nowrap; line-height: 1.35;
   }
+  /* 차수 색은 왼쪽 막대로만 쓴다. 칩 배경을 물들이면 단축 운행 표시와 겹친다. */
+  .train.fleet { border-left: 3px solid var(--fleet); padding-left: 5px; }
   .train.short { background: var(--warn-bg); color: var(--warn-fg); font-weight: 600; }
   .train .no { color: var(--muted); font-size: 11px; margin-left: 4px; }
+  .train.express::before { content: "급행 "; font-size: 11px; font-weight: 600; }
   .train.last::after { content: " 막차"; font-size: 11px; color: var(--warn-fg); }
+
+  .scope { font-size: 12px; color: var(--muted); margin-top: 8px; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+  .scope button {
+    border: 0; background: var(--card); color: inherit; cursor: pointer;
+    font: inherit; padding: 3px 9px; border-radius: 999px;
+  }
 
   /* 환승역만 눌러서 펼칠 수 있다. 점선 밑줄이 그 표시다. */
   .name button {
-    border: 0; background: var(--bg); font: inherit; color: inherit;
-    padding: 2px 6px; border-radius: 4px; cursor: pointer;
+    border: 0; font: inherit; color: inherit; cursor: pointer;
     border-bottom: 1px dashed var(--muted);
   }
   .name button[aria-expanded="true"] { background: var(--card); }
@@ -87,35 +121,53 @@
   .tr-row { display: flex; gap: 10px; align-items: baseline; padding: 2px 0; }
   .tr-dir { min-width: 62px; color: var(--muted); }
   .tr-line { flex: 1; }
-  .tr-door { font-weight: 600; color: var(--line); white-space: nowrap; }
+  .tr-door { font-weight: 600; }
   .tr-note { margin: 8px 0 0; color: var(--muted); line-height: 1.5; }
 
-  footer { margin-top: 24px; font-size: 12px; color: var(--muted); }
+  footer { margin-top: 24px; padding-top: 12px; border-top: 1px solid var(--edge); font-size: 12px; color: var(--muted); }
   footer a { color: inherit; }
 </style>
 </head>
 <body>
 <header>
-  <h1>신분당선</h1>
-  <span id="status">불러오는 중</span>
+  <h1>수도권 전철 실시간</h1>
+  <div id="budget"></div>
 </header>
-<p class="legend">
-  왼쪽이 신사 방면, 오른쪽이 광교 방면입니다. <b>정자행</b>처럼 노선 끝까지 가지 않는 열차는 따로 표시합니다.
-  밑줄 친 역 이름을 누르면 빠른 환승 문 위치가 열립니다.
-</p>
 
-<div class="rail" id="rail"></div>
+<div id="lines"></div>
 
 <footer>
-  자료: 서울시 실시간 지하철 정보.<span id="transfer-source"></span>
-  <span id="budget"></span>
+  자료: 서울시 실시간 지하철 정보, 용인경전철.<span id="transfer-source"></span>
 </footer>
 
 <script>
-const SLUG = 'shinbundang';
 const REFRESH_MS = 30000;
-let stations = [];
-let transfers = null;
+const STORAGE_KEY = 'kennymetro.view';
+
+let lines = [];
+let budget = { apiCallBudget: 0, apiCallCount: 0 };
+let transfersByLine = {};
+let transferCredit = null;
+
+// 펼친 노선과 전 구간 보기 여부는 사람마다 다르다. 서버에 계정이 없으므로 이 브라우저에만 둔다.
+let view = { open: [], full: [] };
+
+function loadView() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+    if (saved && Array.isArray(saved.open) && Array.isArray(saved.full)) view = saved;
+  } catch (e) {
+    // 사생활 보호 모드나 저장소 차단. 기본값으로 간다.
+  }
+}
+
+function saveView() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(view));
+  } catch (e) {
+    // 저장에 실패해도 이번 방문에는 영향이 없다.
+  }
+}
 
 function el(tag, cls, text) {
   const n = document.createElement(tag);
@@ -124,22 +176,84 @@ function el(tag, cls, text) {
   return n;
 }
 
-function buildRail(names) {
-  const rail = document.getElementById('rail');
-  rail.replaceChildren();
-  names.forEach((name, i) => {
+function isOpen(slug) { return view.open.includes(slug); }
+function isFull(slug) { return view.full.includes(slug); }
+
+function toggleIn(list, slug) {
+  const i = list.indexOf(slug);
+  if (i < 0) list.push(slug); else list.splice(i, 1);
+  saveView();
+}
+
+/* ---------- 노선도 ---------- */
+
+/** 화면에 그릴 역 범위. 전 구간 보기가 아니면 관심 구간만 그린다. */
+function rangeOf(line) {
+  if (isFull(line.slug) || line.focusFrom === null || line.focusTo === null) {
+    return { from: 0, to: line.stations.length - 1 };
+  }
+  return { from: line.focusFrom, to: line.focusTo };
+}
+
+function buildRail(line) {
+  const rail = el('div', 'rail');
+  const range = rangeOf(line);
+  const transfers = transfersByLine[line.slug];
+  for (let i = range.from; i <= range.to; i++) {
+    const name = line.stations[i];
     const stop = el('div', 'stop');
+    stop.dataset.index = String(i);
     stop.appendChild(el('div', 'lane up', ''));
+
     const label = el('div', 'name');
     const info = transfers && transfers.get(name);
-    label.appendChild(info ? transferToggle(name, 'tr-' + i) : el('span', null, name));
+    const panelId = 'tr-' + line.slug + '-' + i;
+    const node = info ? transferToggle(name, panelId) : el('span', null, name);
+    if (line.keyStations.includes(name)) node.classList.add('key');
+    label.appendChild(node);
     stop.appendChild(label);
+
     stop.appendChild(el('div', 'lane down', ''));
-    stop.dataset.index = String(i);
     rail.appendChild(stop);
-    if (info) rail.appendChild(buildTransferPanel('tr-' + i, info));
-  });
+    if (info) rail.appendChild(buildTransferPanel(panelId, info));
+  }
+  return rail;
 }
+
+function placeTrains(section, line, trains) {
+  section.querySelectorAll('.lane').forEach(l => l.replaceChildren());
+  const range = rangeOf(line);
+  let outside = 0;
+  for (const t of trains) {
+    const idx = line.stations.indexOf(t.currentStation);
+    if (idx < 0) continue;
+    if (idx < range.from || idx > range.to) { outside++; continue; }
+    const stop = section.querySelector('.stop[data-index="' + idx + '"]');
+    if (!stop) continue;
+    const lane = stop.querySelector(t.direction === 'UP' ? '.lane.up' : '.lane.down');
+    lane.appendChild(trainChip(line, t));
+  }
+  return outside;
+}
+
+function trainChip(line, t) {
+  let cls = 'train';
+  if (t.isShortTurn) cls += ' short';
+  if (t.isLastTrain) cls += ' last';
+  if (t.isExpress) cls += ' express';
+  if (t.fleet) cls += ' fleet';
+  const chip = el('div', cls);
+  if (t.fleet) {
+    const gen = line.fleet.generations.find(g => g.label === t.fleet);
+    if (gen) chip.style.setProperty('--fleet', gen.color);
+    chip.title = t.fleet;
+  }
+  chip.appendChild(document.createTextNode(t.destination + '행'));
+  chip.appendChild(el('span', 'no', t.trainNo));
+  return chip;
+}
+
+/* ---------- 환승 ---------- */
 
 function transferToggle(name, panelId) {
   const btn = el('button', null, name);
@@ -186,41 +300,106 @@ function groupDoors(doors) {
   return [...groups.values()];
 }
 
-/** 출처와 라이선스 표기. CC BY 조건이라 빼면 안 된다. */
-function renderSource(data) {
-  const box = document.getElementById('transfer-source');
-  box.replaceChildren(document.createTextNode(' 환승 문 위치: ' + data.source + ' ('));
-  const a = el('a', null, data.license);
-  a.href = data.licenseUrl;
-  a.rel = 'license noopener';
-  a.target = '_blank';
-  box.appendChild(a);
-  box.appendChild(document.createTextNode(').'));
+/* ---------- 노선 섹션 ---------- */
+
+function buildSection(line) {
+  const section = el('section', 'line');
+  section.dataset.slug = line.slug;
+
+  const head = el('div', 'line-head');
+  const toggle = el('button', 'line-toggle');
+  toggle.type = 'button';
+  const dot = el('span', 'dot');
+  dot.style.background = line.color;
+  toggle.appendChild(dot);
+  toggle.appendChild(document.createTextNode(line.name));
+  const caret = el('span', 'caret');
+  toggle.appendChild(caret);
+  head.appendChild(toggle);
+
+  const status = el('span', 'line-status', '');
+  head.appendChild(status);
+  section.appendChild(head);
+
+  const body = el('div', 'line-body');
+  body.appendChild(buildLegend(line));
+  if (line.fleet) body.appendChild(buildFleetLegend(line));
+  body.appendChild(buildRail(line));
+  body.appendChild(buildScope(line, section));
+  section.appendChild(body);
+
+  const apply = () => {
+    const open = isOpen(line.slug);
+    body.hidden = !open;
+    toggle.setAttribute('aria-expanded', String(open));
+    caret.textContent = open ? '▾' : '▸';
+    if (!open) status.textContent = '';
+  };
+  toggle.addEventListener('click', () => {
+    toggleIn(view.open, line.slug);
+    apply();
+    if (isOpen(line.slug)) refresh(line);
+  });
+  apply();
+
+  return section;
 }
 
-async function loadTransfers() {
-  const res = await fetch(`/api/lines/${SLUG}/transfers`, { cache: 'no-store' });
-  if (!res.ok) throw new Error('HTTP ' + res.status);
-  const data = await res.json();
-  transfers = new Map(data.stations.map(s => [s.station, s]));
-  renderSource(data);
-}
-
-function placeTrains(trains) {
-  document.querySelectorAll('.lane').forEach(l => l.replaceChildren());
-  for (const t of trains) {
-    const idx = stations.indexOf(t.currentStation);
-    if (idx < 0) continue;
-    const stop = document.querySelector(`.stop[data-index="${idx}"]`);
-    if (!stop) continue;
-    const lane = stop.querySelector(t.direction === 'UP' ? '.lane.up' : '.lane.down');
-    const chip = el('div', 'train' + (t.isShortTurn ? ' short' : '') + (t.isLastTrain ? ' last' : ''));
-    chip.appendChild(document.createTextNode(t.destination + '행'));
-    const no = el('span', 'no', t.trainNo);
-    chip.appendChild(no);
-    lane.appendChild(chip);
+function buildLegend(line) {
+  const p = el('p', 'legend');
+  p.appendChild(document.createTextNode(
+    '왼쪽이 ' + line.upLabel + ' 방면, 오른쪽이 ' + line.downLabel + ' 방면입니다. '));
+  if (!line.circular) {
+    const b = el('b', null, '단축 운행');
+    p.appendChild(b);
+    p.appendChild(document.createTextNode('은 노선 끝까지 가지 않는 열차입니다. '));
   }
+  p.appendChild(document.createTextNode('밑줄 친 역 이름을 누르면 환승 문 위치가 열립니다.'));
+  return p;
 }
+
+function buildFleetLegend(line) {
+  const box = el('div', 'fleet-legend');
+  for (const g of line.fleet.generations) {
+    // 차수마다 그 차수를 다루는 문단으로 간다. 색이 무엇을 뜻하는지 여기서 바로 확인된다.
+    const chip = el('a', 'fleet-chip', g.label);
+    chip.style.setProperty('--fleet', g.color);
+    chip.title = g.note;
+    chip.href = g.url;
+    chip.rel = 'noopener';
+    chip.target = '_blank';
+    box.appendChild(chip);
+  }
+  box.appendChild(el('span', 'fleet-source', '출처: ' + line.fleet.sourceName));
+  return box;
+}
+
+function buildScope(line, section) {
+  const box = el('div', 'scope');
+  if (line.focusFrom === null || line.focusTo === null) return box;
+
+  const btn = el('button');
+  btn.type = 'button';
+  const note = el('span', 'scope-note', '');
+  const apply = () => {
+    btn.textContent = isFull(line.slug)
+      ? '관심 구간만 보기'
+      : '전 구간 보기 (' + line.stations.length + '역)';
+  };
+  btn.addEventListener('click', () => {
+    toggleIn(view.full, line.slug);
+    apply();
+    const rail = section.querySelector('.rail');
+    rail.replaceWith(buildRail(line));
+    refresh(line);
+  });
+  apply();
+  box.appendChild(btn);
+  box.appendChild(note);
+  return box;
+}
+
+/* ---------- 데이터 ---------- */
 
 function describeAge(iso) {
   if (!iso) return '아직 받지 못했습니다';
@@ -229,31 +408,87 @@ function describeAge(iso) {
   return Math.floor(sec / 60) + '분 전 기준';
 }
 
-async function load() {
-  const status = document.getElementById('status');
+function renderBudget() {
+  const box = document.getElementById('budget');
+  const open = lines.filter(l => isOpen(l.slug) && l.budgeted).length;
+  const parts = ['서울시 API ' + budget.apiCallCount + ' / ' + budget.apiCallBudget + '회'];
+  if (open > 1) parts.push('펼친 노선이 ' + open + '개라 갱신 한 번에 ' + open + '회씩 나갑니다');
+  box.textContent = parts.join('. ');
+}
+
+async function refresh(line) {
+  const section = document.querySelector('.line[data-slug="' + line.slug + '"]');
+  if (!section || !isOpen(line.slug)) return;
+  const status = section.querySelector('.line-status');
   try {
-    const res = await fetch(`/api/lines/${SLUG}/trains`, { cache: 'no-store' });
+    const res = await fetch('/api/lines/' + line.slug + '/trains', { cache: 'no-store' });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
-    if (stations.length === 0) {
-      stations = data.stations;
-      buildRail(stations);
-    }
-    placeTrains(data.trains);
-    status.textContent = `열차 ${data.trains.length}대 / ${describeAge(data.fetchedAt)}`;
+    const outside = placeTrains(section, line, data.trains);
+    budget.apiCallCount = data.apiCallCount;
+    renderBudget();
+
+    let text = '열차 ' + data.trains.length + '대 / ' + describeAge(data.fetchedAt);
+    if (outside > 0) text += ' / 구간 밖 ' + outside + '대';
+    status.textContent = text;
   } catch (e) {
     status.textContent = '불러오지 못했습니다';
   }
 }
 
-// 환승 데이터는 정적이라 한 번만 받는다. 노선도를 그릴 때 필요하므로 열차보다 먼저 받되,
-// 실패해도 열차 위치는 떠야 하므로 여기서 끊지 않는다.
-loadTransfers().catch(() => {}).then(() => {
-  load();
-  setInterval(load, REFRESH_MS);
-});
+function refreshOpen() {
+  for (const line of lines) {
+    if (isOpen(line.slug)) refresh(line);
+  }
+}
+
+async function loadTransfers(line) {
+  const res = await fetch('/api/lines/' + line.slug + '/transfers', { cache: 'no-store' });
+  if (!res.ok) return;
+  const data = await res.json();
+  if (data.stations.length === 0) return;
+  transfersByLine[line.slug] = new Map(data.stations.map(s => [s.station, s]));
+  transferCredit = data;
+}
+
+/** 출처와 라이선스 표기. CC BY 조건이라 빼면 안 된다. */
+function renderTransferSource() {
+  if (!transferCredit) return;
+  const box = document.getElementById('transfer-source');
+  box.replaceChildren(document.createTextNode(' 환승 문 위치: ' + transferCredit.source + ' ('));
+  const a = el('a', null, transferCredit.license);
+  a.href = transferCredit.licenseUrl;
+  a.rel = 'license noopener';
+  a.target = '_blank';
+  box.appendChild(a);
+  box.appendChild(document.createTextNode(').'));
+}
+
+async function boot() {
+  loadView();
+  const res = await fetch('/api/lines', { cache: 'no-store' });
+  const data = await res.json();
+  lines = data.lines;
+  budget = { apiCallBudget: data.apiCallBudget, apiCallCount: data.apiCallCount };
+
+  // 저장된 것이 없으면 첫 노선만 펼친다. 펼친 노선 수만큼 호출 예산이 나가므로
+  // 전부 펼친 채로 시작하지 않는다.
+  if (view.open.length === 0) view.open = [lines[0].slug];
+
+  // 환승 데이터는 정적이라 한 번만 받는다. 노선도를 그릴 때 필요하므로 먼저 받는다.
+  await Promise.all(lines.map(l => loadTransfers(l).catch(() => {})));
+  renderTransferSource();
+
+  const box = document.getElementById('lines');
+  box.replaceChildren(...lines.map(buildSection));
+  renderBudget();
+  refreshOpen();
+}
+
+boot();
+setInterval(refreshOpen, REFRESH_MS);
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') load();
+  if (document.visibilityState === 'visible') refreshOpen();
 });
 </script>
 </body>
