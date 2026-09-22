@@ -199,6 +199,17 @@ ledger-memo 구성을 따르되 저장소 계층을 뺀다.
 
 시각표 PDF 파싱에 `pdftotext` 가 필요하다. 런타임 이미지에 poppler 를 넣을지, 빌드 시점에 파싱해 JSON 을 산출물에 포함할지는 정하지 않았다. 후자가 런타임 의존을 없애지만 시각표 개정 때마다 재배포가 필요하다.
 
+### 4.1 native image 로 넘어가기 전에 처리할 것
+
+**Kotlin 의 빈 컬렉션 싱글톤이 native 에서 Jackson 직렬화를 깨뜨린다.** `mapNotNull` 이나 `toList()` 는 결과가 비면 `kotlin.collections.EmptyList` 를 돌려주는데, 이는 Kotlin 내부 object 라 native image 에 메타데이터가 없으면 `KotlinReflectionInternalError: Unresolved class` 로 응답 직렬화가 실패한다.
+
+**이 프로젝트는 매일 밤 그 상태가 된다.** 운행이 끝나면 열차 목록이 비고, 그 빈 목록이 그대로 응답에 실린다. 조치는 두 가지를 함께 한다.
+
+1. `RuntimeHintsRegistrar` 로 `kotlin.collections.EmptyList`, `EmptyMap`, `EmptySet` 을 등록한다.
+2. 응답 DTO 에 담기 전에 `ArrayList(...)` 로 감싸 애초에 만들지 않는다.
+
+**JVM 테스트로는 잡히지 않는다.** JVM 에는 메타데이터가 그대로 있어 전부 통과하고 native 바이너리에서만 터진다. 그래서 CI 의 native job 은 빌드만 하지 말고 바이너리를 실제로 띄워 **열차가 0대인 응답까지** 왕복해야 한다.
+
 ## 5. 확인 예정
 
 1. `trainSttus` 의 값별 의미. 진입과 도착과 출발을 가르는 값으로 보이나 확정하지 않았다. 열차를 역에 그릴지 역 사이에 그릴지가 여기 걸린다.
