@@ -18,6 +18,8 @@ class LineCatalog(properties: MetroProperties) {
 
     private val lines: List<Line> = properties.lines.map { it.toLine() }
     private val bySlug: Map<String, Line> = lines.associateBy { it.slug }
+    private val byName: Map<String, Line> = lines.associateBy { it.name }
+    private val colors: Map<String, String> = properties.transferColors
 
     init {
         require(lines.isNotEmpty()) { "노선이 하나도 없다. lines.yml 이 실리지 않았다" }
@@ -25,6 +27,12 @@ class LineCatalog(properties: MetroProperties) {
     }
 
     fun all(): List<Line> = lines
+
+    /** 환승 대상 노선의 색. 우리가 담지 않는 노선도 들어 있다. */
+    fun transferColors(): Map<String, String> = colors
+
+    /** 이름으로 찾는다. 환승 대상이 우리가 담은 노선인지 가릴 때 쓴다. */
+    fun byName(name: String): Line? = byName[name]
 
     fun bySlug(slug: String): Line? = bySlug[slug]
 

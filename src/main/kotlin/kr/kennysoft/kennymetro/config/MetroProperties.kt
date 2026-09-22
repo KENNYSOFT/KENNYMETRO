@@ -13,6 +13,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties
 @ConfigurationProperties(prefix = "metro")
 data class MetroProperties(
     val lines: List<LineConfig>,
+    /** 환승 대상 노선의 색. 우리가 담지 않는 노선까지 들어 있어 노선 정의와 따로 둔다. */
+    val transferColors: Map<String, String> = emptyMap(),
 )
 
 data class LineConfig(

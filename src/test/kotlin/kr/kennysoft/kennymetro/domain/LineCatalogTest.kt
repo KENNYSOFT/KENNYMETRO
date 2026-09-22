@@ -6,6 +6,7 @@ import kr.kennysoft.kennymetro.config.MetroProperties
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -62,6 +63,19 @@ class LineCatalogTest {
         // given & when & then
         assertNull(TestLines.line2.fleet)
         assertNull(TestLines.everline.fleet)
+    }
+
+    @Test
+    fun `환승 노선 색의 키가 온전히 들어온다`() {
+        // given - Spring 의 relaxed binding 은 맵 키에서 한글을 떼어낸다. 키를 대괄호로
+        // 감싸지 않으면 1호선과 인천1호선이 둘 다 "1" 로 뭉개져 색이 뒤바뀐다.
+        val colors = TestLines.catalog.transferColors()
+
+        // when & then
+        assertTrue(colors.containsKey("1호선"), "키가 뭉개졌다: ${colors.keys}")
+        assertTrue(colors.containsKey("인천1호선"), "키가 뭉개졌다: ${colors.keys}")
+        assertNotEquals(colors["1호선"], colors["인천1호선"])
+        assertTrue(colors.size >= 20, "색이 덮여 사라졌다: ${colors.size}개")
     }
 
     @Test

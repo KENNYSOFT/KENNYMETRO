@@ -23,6 +23,7 @@ class LineController(
     @GetMapping("/api/lines")
     fun lines(): LinesResponse = LinesResponse(
         lines = ArrayList(catalog.all().map { it.toView() }),
+        transferColors = LinkedHashMap(catalog.transferColors()),
         apiCallBudget = properties.dailyCallBudget,
         apiCallCount = trainPositionService.apiCallCount(),
     )
@@ -46,6 +47,8 @@ class LineController(
 
 data class LinesResponse(
     val lines: List<LineView>,
+    /** 환승 문 위치에 노선 동그라미를 붙이는 데 쓴다. */
+    val transferColors: Map<String, String>,
     val apiCallBudget: Int,
     val apiCallCount: Long,
 )

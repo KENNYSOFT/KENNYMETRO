@@ -26,7 +26,7 @@ import org.springframework.stereotype.Component
  * `scripts/smoke-test.sh` 가 실제 바이너리로 왕복해 확인한다.
  */
 @Component
-class TransferDoorRepository(catalog: LineCatalog) {
+class TransferDoorRepository(private val catalog: LineCatalog) {
 
     private val byLine: Map<String, LineTransfers> = catalog.all().associate { it.slug to load(it) }
 
@@ -53,12 +53,35 @@ class TransferDoorRepository(catalog: LineCatalog) {
             "transfer/${line.slug}-doors.csv 의 역을 ${line.name} 순서대로 적어야 한다: ${doors.keys}"
         }
 
+        verifyTargets(line, doors)
+
         return LineTransfers(
             source = doorFile.source(line.slug),
             stations = doors.map { (station, stationDoors) ->
                 StationTransfer(station, notes[station], stationDoors)
             },
         )
+    }
+
+    /**
+     * 환승 대상이 우리가 담은 노선이면 그 역이 상대 노선에도 있어야 한다.
+     *
+     * <p>
+     * 원본 문서에서 표를 옮길 때 역 제목을 놓치면 그 표가 앞 역에 붙는다. 그렇게 생긴
+     * 행은 역명도 노선도 각각은 멀쩡해 다른 검사에 걸리지 않으므로, 두 노선이 실제로
+     * 그 역에서 만나는지를 따로 본다. 우리가 담지 않은 노선은 대조할 것이 없어 넘어간다.
+     */
+    private fun verifyTargets(line: Line, doors: Map<String, List<TransferDoor>>) {
+        doors.forEach { (station, stationDoors) ->
+            stationDoors.forEach { door ->
+                door.targetLine.split("/").forEach { name ->
+                    val other = catalog.byName(name.trim()) ?: return@forEach
+                    require(other.indexOf(station) != null) {
+                        "transfer/${line.slug}-doors.csv: ${line.name} $station 역은 ${other.name} 에 없어 환승할 수 없다"
+                    }
+                }
+            }
+        }
     }
 
     private fun parseDoors(file: ParsedFile, line: Line): Map<String, List<TransferDoor>> {
