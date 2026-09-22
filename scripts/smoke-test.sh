@@ -83,6 +83,14 @@ echo "$BODY" | grep -q '"trainNo":"11"' || fail "11번 열차가 응답에 없�
 echo "$BODY" | grep -q '"trainNo":"13"' && fail "종착 처리 중인 13번이 응답에 들어갔다: $BODY"
 echo "$BODY" | grep -q '"trainNo":"12","currentStation":"광교","destination":"신사","direction":"UP"' \
   || fail "회차 대기 열차의 방향이 UP 이 아니다: $BODY"
+
+# 환승 데이터는 classpath 리소스라 native image 에 자동으로 실리지 않는다. 힌트를 빠뜨리면
+# JVM 에서는 멀쩡히 읽히고 바이너리에서만 파일이 없는 것처럼 빈 목록이 된다.
+TRANSFERS=$(curl -sf "$BASE/api/lines/shinbundang/transfers") || fail "환승 정보를 받지 못했다"
+echo "$TRANSFERS" | grep -q '"stations":\[\]' && fail "환승 데이터가 비었다. CSV 가 native image 에 실리지 않았다"
+echo "$TRANSFERS" | grep -q '"car":6,"door":4' || fail "환승 문 위치가 응답에 없다: $TRANSFERS"
+# 출처 표기는 CC BY 조건이라 화면에서 뺄 수 없다.
+echo "$TRANSFERS" | grep -q '"license":"CC BY-NC-SA 2.0 KR"' || fail "라이선스 표기가 빠졌다: $TRANSFERS"
 echo "  통과"
 
 stop_all

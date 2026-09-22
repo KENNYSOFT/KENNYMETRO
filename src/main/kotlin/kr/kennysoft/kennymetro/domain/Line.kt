@@ -25,5 +25,8 @@ enum class Line(
 
     companion object {
         fun byLineName(lineName: String): Line? = entries.find { it.lineName == lineName }
+
+        /** URL 경로에 쓰는 이름. enum 이름을 소문자로 적은 것이고 리소스 파일명도 이것을 따른다. */
+        fun bySlug(slug: String): Line? = entries.find { it.name.equals(slug, ignoreCase = true) }
     }
 }

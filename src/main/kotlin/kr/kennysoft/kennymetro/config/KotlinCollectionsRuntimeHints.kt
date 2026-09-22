@@ -54,5 +54,5 @@ class KotlinCollectionsRuntimeHints : RuntimeHintsRegistrar {
 }
 
 @Configuration(proxyBeanMethods = false)
-@ImportRuntimeHints(KotlinCollectionsRuntimeHints::class)
+@ImportRuntimeHints(KotlinCollectionsRuntimeHints::class, TransferDataRuntimeHints::class)
 class NativeHintsConfig
