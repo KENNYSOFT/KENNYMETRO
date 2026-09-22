@@ -34,7 +34,10 @@ data class LineConfig(
 )
 
 data class FleetConfig(
-    val sourceName: String,
+    /** 편성 범위를 옮겨 온 문서와 그 판. 위키는 계속 고쳐지므로 판까지 적는다. */
+    val sourceDocument: String,
+    val sourceRevision: String,
+    val sourceUrl: String,
     val generations: List<FleetGenerationConfig>,
 )
 

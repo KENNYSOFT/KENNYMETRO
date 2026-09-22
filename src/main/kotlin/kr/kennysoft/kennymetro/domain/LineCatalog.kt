@@ -70,7 +70,9 @@ class LineCatalog(properties: MetroProperties) {
         }
         sorted.forEach { require(it.from <= it.to) { "$slug: ${it.label} 의 편성 범위가 뒤집혔다" } }
         return Fleet(
-            sourceName = sourceName,
+            sourceDocument = sourceDocument,
+            sourceRevision = sourceRevision,
+            sourceUrl = sourceUrl,
             generations = sorted.map { FleetGeneration(it.label, it.color, it.from, it.to, it.note, it.url) },
         )
     }

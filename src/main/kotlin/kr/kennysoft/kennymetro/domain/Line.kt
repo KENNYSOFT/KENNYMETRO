@@ -47,7 +47,9 @@ data class Line(
  * (DESIGN.md 2.2). 다른 노선은 4자리 운행번호라 어느 차량인지 알 수 없다.
  */
 data class Fleet(
-    val sourceName: String,
+    val sourceDocument: String,
+    val sourceRevision: String,
+    val sourceUrl: String,
     val generations: List<FleetGeneration>,
 ) {
 

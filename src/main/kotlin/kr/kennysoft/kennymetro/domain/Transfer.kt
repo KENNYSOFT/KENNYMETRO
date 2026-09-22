@@ -24,3 +24,30 @@ data class StationTransfer(
     val note: String?,
     val doors: List<TransferDoor>,
 )
+
+/**
+ * 한 노선의 환승 정보와 그 출처.
+ *
+ * <p>
+ * 출처가 노선마다 다르다. 나무위키가 환승 정보를 노선별 하위 문서로 나눠 두어서, 어느
+ * 문서의 몇 번째 판에서 가져왔는지도 노선마다 갈린다.
+ */
+data class LineTransfers(
+    val source: TransferSource?,
+    val stations: List<StationTransfer>,
+)
+
+/**
+ * 데이터를 가져온 문서와 그 판. CC BY 조건이라 화면에 그대로 표시한다.
+ *
+ * <p>
+ * 판까지 적는 것은 위키가 계속 고쳐지기 때문이다. 문서명만으로는 우리가 옮긴 시점의 내용을
+ * 가리킬 수 없다.
+ */
+data class TransferSource(
+    val document: String,
+    val revision: String,
+    val url: String,
+    val license: String,
+    val licenseUrl: String,
+)

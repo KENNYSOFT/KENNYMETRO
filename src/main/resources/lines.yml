@@ -26,7 +26,9 @@ metro:
       # 차수마다 그 차수를 다루는 문단으로 링크를 건다. 편성 범위는 같은 문서의
       # /현황 하위 문서에 있는 표에서 옮겼다.
       fleet:
-        source-name: 나무위키
+        source-document: 네오트랜스 D000호대 전동차/현황
+        source-revision: r76
+        source-url: https://namu.wiki/w/네오트랜스 D000호대 전동차/현황
         generations:
           - label: 1차분
             color: "#8b5cf6"

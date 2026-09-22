@@ -1,7 +1,11 @@
 # 환승역별 주의사항
 #
-# 출처와 라이선스는 shinbundang-doors.csv 와 같다.
-# 나무위키 "수도권 전철 환승 정보" / CC BY-NC-SA 2.0 KR
+# 출처와 라이선스. 파서가 이 키들을 읽어 화면에 그대로 띄운다. CC BY 조건이라 뺄 수 없다.
+# source-document: 수도권 전철 환승 정보
+# source-revision: r697
+# source-url: https://namu.wiki/w/수도권 전철 환승 정보
+# license: CC BY-NC-SA 2.0 KR
+# license-url: https://creativecommons.org/licenses/by-nc-sa/2.0/kr/
 #
 # 컬럼: 역,비고
 # 파서가 첫 쉼표 하나로만 가르므로 비고 안에는 쉼표를 써도 된다.

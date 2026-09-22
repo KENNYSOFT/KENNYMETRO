@@ -90,8 +90,11 @@ echo "$BODY" | grep -q '"trainNo":"12","currentStation":"광교","destination":"
 TRANSFERS=$(curl -sf "$BASE/api/lines/shinbundang/transfers") || fail "환승 정보를 받지 못했다"
 echo "$TRANSFERS" | grep -q '"stations":\[\]' && fail "환승 데이터가 비었다. CSV 가 native image 에 실리지 않았다"
 echo "$TRANSFERS" | grep -q '"car":6,"door":4' || fail "환승 문 위치가 응답에 없다: $TRANSFERS"
-# 출처 표기는 CC BY 조건이라 화면에서 뺄 수 없다.
+# 출처 표기는 CC BY 조건이라 화면에서 뺄 수 없다. 문서명과 판은 CSV 머리의 주석에서
+# 읽으므로, 그 파싱이 깨지면 여기가 빈다.
 echo "$TRANSFERS" | grep -q '"license":"CC BY-NC-SA 2.0 KR"' || fail "라이선스 표기가 빠졌다: $TRANSFERS"
+echo "$TRANSFERS" | grep -q '"revision":"r' || fail "출처 판이 빠졌다: $TRANSFERS"
+echo "$TRANSFERS" | grep -q '"document":"수도권' || fail "출처 문서명이 빠졌다: $TRANSFERS"
 
 # 노선 목록. lines.yml 이 native image 에 실리지 않으면 여기가 빈다.
 LINES=$(curl -sf "$BASE/api/lines") || fail "노선 목록을 받지 못했다"
