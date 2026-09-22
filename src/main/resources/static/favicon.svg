@@ -1,17 +1,22 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
   <!-- 전동차 정면. 16px 로 줄어도 형태가 남도록 앞유리와 전조등만 남기고 덜어냈다.
-       몸체 색은 페이지의 신분당선 색과 같고, 어두운 탭 배경에서 묻히지 않게 다크
-       모드에서만 한 단계 밝힌다.
+       몸체에 특정 노선 색을 쓰지 않는다. 이 사이트는 수도권 전철 전체를 다루므로
+       한 노선의 색을 입히면 그 노선 전용 페이지처럼 보인다. 어느 노선 색과도 겹치지
+       않는 회청색을 쓰고, 어두운 탭 배경에서 묻히지 않게 다크 모드에서만 한 단계
+       밝힌다. 그때도 앞유리(흰색)보다는 어두워야 창이 창으로 보인다.
+       전조등만 노란색인 것은 이 형태가 전동차 앞모습임을 16px 에서 알아보게 하는
+       단서다. 이 크기에서는 앞유리 하나만으로 방향이 읽히지 않는다.
        XML 주석이라 붙임표 두 개를 이어 쓸 수 없다. CSS 변수 이름을 그대로 적지 말 것. -->
   <style>
-    .car { fill: #bb1833 }
+    .car { fill: #3f4a5c }
     .glass { fill: #fff }
+    .lamp { fill: #f7c948 }
     @media (prefers-color-scheme: dark) {
-      .car { fill: #e04a62 }
+      .car { fill: #5b6b85 }
     }
   </style>
   <rect class="car" x="5" y="2" width="22" height="28" rx="7"/>
   <rect class="glass" x="9" y="6.5" width="14" height="10" rx="3"/>
-  <rect class="glass" x="8.5" y="20.5" width="6" height="4" rx="2"/>
-  <rect class="glass" x="17.5" y="20.5" width="6" height="4" rx="2"/>
+  <rect class="lamp" x="8.5" y="20.5" width="6" height="4" rx="2"/>
+  <rect class="lamp" x="17.5" y="20.5" width="6" height="4" rx="2"/>
 </svg>
