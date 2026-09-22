@@ -8,6 +8,9 @@ spring:
 server:
   port: 8080
   shutdown: graceful
+  # httpd 리버스 프록시 뒤에서 돈다. 이 설정이 없으면 앱이 원래 스킴을 http 로 보고
+  # 절대 URL 과 리다이렉트를 http 로 내보낸다.
+  forward-headers-strategy: framework
 
 management:
   endpoints:
