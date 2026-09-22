@@ -14,12 +14,36 @@ import kotlin.test.assertTrue
 class LineCatalogTest {
 
     @Test
-    fun `설정에 적힌 노선을 모두 읽는다`() {
-        // given & when
-        val slugs = TestLines.catalog.all().map { it.slug }
+    fun `프리셋이 가리키는 노선이 모두 있다`() {
+        // given - 프리셋은 처음 방문한 브라우저가 보여줄 목록이라 하나라도 없으면 화면이 빈다.
+        val catalog = TestLines.catalog
+        val slugs = catalog.all().map { it.slug }
 
-        // then
-        assertEquals(listOf("shinbundang", "line2", "line9", "suinbundang", "everline"), slugs)
+        // when & then
+        assertEquals(listOf("shinbundang", "line2", "line9", "suinbundang", "everline"), catalog.preset())
+        catalog.preset().forEach { assertTrue(it in slugs, "프리셋이 가리키는 노선이 없다: $it") }
+    }
+
+    @Test
+    fun `지선 뷰는 같은 API 노선을 나눠 쓴다`() {
+        // given - 1호선은 구로에서 갈려 뷰가 둘이지만 API 는 "1호선" 하나로 전체를 준다.
+        val gyeongin = TestLines.bySlug("line1-gyeongin")
+        val gyeongbu = TestLines.bySlug("line1-gyeongbu")
+
+        // when & then
+        assertEquals("1호선", gyeongin.apiName)
+        assertEquals(gyeongin.cacheKey, gyeongbu.cacheKey)
+        // 갈리는 지점부터는 역이 달라야 뷰를 나눈 뜻이 있다.
+        assertNotNull(gyeongin.indexOf("인천"))
+        assertNull(gyeongbu.indexOf("인천"))
+        assertNotNull(gyeongbu.indexOf("신창"))
+    }
+
+    @Test
+    fun `api-name 을 적지 않으면 노선 이름을 쓴다`() {
+        // given & when & then
+        assertEquals("2호선", TestLines.line2.apiName)
+        assertEquals("신분당선", TestLines.shinbundang.apiName)
     }
 
     @Test

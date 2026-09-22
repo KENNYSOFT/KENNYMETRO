@@ -20,13 +20,19 @@ class LineCatalog(properties: MetroProperties) {
     private val bySlug: Map<String, Line> = lines.associateBy { it.slug }
     private val byName: Map<String, Line> = lines.associateBy { it.name }
     private val colors: Map<String, String> = properties.transferColors
+    private val preset: List<String> = properties.preset
 
     init {
         require(lines.isNotEmpty()) { "노선이 하나도 없다. lines.yml 이 실리지 않았다" }
         require(bySlug.size == lines.size) { "slug 가 겹친다: ${lines.map { it.slug }}" }
+        preset.forEach { require(it in bySlug) { "preset 이 없는 노선을 가리킨다: $it" } }
+        require(preset.size == preset.distinct().size) { "preset 에 같은 노선이 두 번 있다: $preset" }
     }
 
     fun all(): List<Line> = lines
+
+    /** 아직 아무것도 고르지 않은 브라우저에 보여줄 노선과 그 순서. */
+    fun preset(): List<String> = preset.ifEmpty { lines.map { it.slug } }
 
     /** 환승 대상 노선의 색. 우리가 담지 않는 노선도 들어 있다. */
     fun transferColors(): Map<String, String> = colors
@@ -57,6 +63,7 @@ class LineCatalog(properties: MetroProperties) {
         return Line(
             slug = slug,
             name = name,
+            apiName = apiName ?: name,
             color = color,
             source = source,
             circular = circular,

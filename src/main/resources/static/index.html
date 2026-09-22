@@ -99,10 +99,32 @@
   .train.last::after { content: " 막차"; font-size: 11px; color: var(--warn-fg); }
 
   .scope { font-size: 12px; color: var(--muted); margin-top: 8px; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
-  .scope button {
+  .scope button, .pick button, .set button {
     border: 0; background: var(--card); color: inherit; cursor: pointer;
     font: inherit; padding: 3px 9px; border-radius: 999px;
   }
+
+  /* 개인 설정. 관심 구간과 주요 역, 보여줄 노선은 사람마다 다르다.
+     서버에 계정이 없으므로 고른 값은 이 브라우저에만 남는다. */
+  .pick, .set { font-size: 12px; margin-top: 8px; }
+  .pick { border: 1px solid var(--edge); border-radius: 8px; padding: 10px 12px; }
+  .pick-note, .set-note { color: var(--muted); margin: 0 0 8px; }
+  .pick-list { display: flex; flex-direction: column; gap: 4px; }
+  .pick-row { display: flex; align-items: center; gap: 6px; }
+  .pick-row .dot { width: 9px; height: 9px; }
+  .pick-name { flex: 1; }
+  .pick-row.off .pick-name { color: var(--muted); }
+  .pick-row button { padding: 2px 8px; }
+  .pick-row button[disabled] { opacity: .35; cursor: default; }
+  .pick-foot { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
+
+  .set { border-top: 1px dashed var(--edge); padding-top: 8px; }
+  .set-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+  .set-label { color: var(--muted); min-width: 56px; }
+  .set select { font: inherit; padding: 3px 6px; border-radius: 6px; border: 1px solid var(--edge); background: var(--bg); color: inherit; }
+  /* 주요 역은 관심 구간 안의 역만 고를 수 있다. 눌린 것이 굵게 선다. */
+  .set-keys { display: flex; gap: 6px; flex-wrap: wrap; }
+  .set-keys button[aria-pressed="true"] { font-weight: 700; outline: 2px solid var(--fg); outline-offset: -2px; }
 
   /* 환승역만 눌러서 펼칠 수 있다. 점선 밑줄이 그 표시다. */
   .name button {
@@ -139,6 +161,10 @@
 <header>
   <h1>수도권 전철 실시간</h1>
   <div id="budget"></div>
+  <div class="scope">
+    <button type="button" id="pick-toggle">노선 고르기</button>
+  </div>
+  <div class="pick" id="pick" hidden></div>
 </header>
 
 <div id="lines"></div>
@@ -152,17 +178,36 @@ const REFRESH_MS = 30000;
 const STORAGE_KEY = 'kennymetro.view';
 
 let lines = [];
+let bySlug = new Map();
+let preset = [];
 let budget = { apiCallBudget: 0, apiCallCount: 0 };
 let transfersByLine = {};
 let transferColors = {};
 
-// 펼친 노선과 전 구간 보기 여부는 사람마다 다르다. 서버에 계정이 없으므로 이 브라우저에만 둔다.
-let view = { open: [], full: [] };
+/**
+ * 이 브라우저의 설정.
+ *
+ * 보여줄 노선, 관심 구간, 주요 역은 사람마다 다르다. 서버에 계정을 두지 않으므로 여기에
+ * 둔다. 비어 있는 칸은 서버가 준 프리셋을 쓴다 - 즉 아무것도 고르지 않은 사람은 프리셋을
+ * 보고, 고친 항목만 자기 값으로 덮인다.
+ */
+let view = { lines: null, open: [], full: [], focus: {}, key: {} };
+
+/** 설정 패널이 열려 있는지. 화면을 다시 그려도 닫히지 않게 들고 있을 뿐 저장하지는 않는다. */
+const openSettings = new Set();
 
 function loadView() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
-    if (saved && Array.isArray(saved.open) && Array.isArray(saved.full)) view = saved;
+    if (!saved) return;
+    // 예전에는 펼침 상태만 담았다. 칸을 늘리면서 그 값을 버리지 않는다.
+    view = {
+      lines: Array.isArray(saved.lines) ? saved.lines : null,
+      open: Array.isArray(saved.open) ? saved.open : [],
+      full: Array.isArray(saved.full) ? saved.full : [],
+      focus: saved.focus && typeof saved.focus === 'object' ? saved.focus : {},
+      key: saved.key && typeof saved.key === 'object' ? saved.key : {},
+    };
   } catch (e) {
     // 사생활 보호 모드나 저장소 차단. 기본값으로 간다.
   }
@@ -192,20 +237,54 @@ function toggleIn(list, slug) {
   saveView();
 }
 
+/* ---------- 개인 설정 ---------- */
+
+/** 지금 보여줄 노선. 고른 적이 없으면 프리셋 그대로다. */
+function chosenSlugs() {
+  return (view.lines || preset).filter(slug => bySlug.has(slug));
+}
+
+function visibleLines() {
+  return chosenSlugs().map(slug => bySlug.get(slug));
+}
+
+/**
+ * 그 노선의 관심 구간. 고쳐 둔 것이 있으면 그 값이고 없으면 프리셋이다.
+ *
+ * 저장은 역 이름으로 한다. 자리 번호로 두면 노선에 역이 하나 끼어드는 순간 저장된 구간이
+ * 통째로 밀린다. 그 사이 없어진 역을 가리키고 있으면 프리셋으로 돌아간다.
+ */
+function focusOf(line) {
+  const mine = view.focus[line.slug];
+  if (Array.isArray(mine) && mine.length === 2) {
+    const a = line.stations.indexOf(mine[0]);
+    const b = line.stations.indexOf(mine[1]);
+    if (a >= 0 && b >= 0) return { from: Math.min(a, b), to: Math.max(a, b) };
+  }
+  if (line.focusFrom === null || line.focusTo === null) return null;
+  return { from: line.focusFrom, to: line.focusTo };
+}
+
+/** 그 노선에서 굵게 세울 역. */
+function keysOf(line) {
+  const mine = view.key[line.slug];
+  return Array.isArray(mine) ? mine : line.keyStations;
+}
+
 /* ---------- 노선도 ---------- */
 
 /** 화면에 그릴 역 범위. 전 구간 보기가 아니면 관심 구간만 그린다. */
 function rangeOf(line) {
-  if (isFull(line.slug) || line.focusFrom === null || line.focusTo === null) {
-    return { from: 0, to: line.stations.length - 1 };
-  }
-  return { from: line.focusFrom, to: line.focusTo };
+  const focus = focusOf(line);
+  if (isFull(line.slug) || !focus) return { from: 0, to: line.stations.length - 1 };
+  return focus;
 }
 
 function buildRail(line) {
   const rail = el('div', 'rail');
   const range = rangeOf(line);
   const transfers = transfersByLine[line.slug];
+  const keys = keysOf(line);
   for (let i = range.from; i <= range.to; i++) {
     const name = line.stations[i];
     const stop = el('div', 'stop');
@@ -216,7 +295,7 @@ function buildRail(line) {
     const info = transfers && transfers.byStation.get(name);
     const panelId = 'tr-' + line.slug + '-' + i;
     const node = info ? transferToggle(name, panelId) : el('span', null, name);
-    if (line.keyStations.includes(name)) node.classList.add('key');
+    if (keys.includes(name)) node.classList.add('key');
     label.appendChild(node);
     stop.appendChild(label);
 
@@ -362,7 +441,8 @@ function buildSection(line) {
   body.appendChild(buildLegend(line));
   if (line.fleet) body.appendChild(buildFleetLegend(line));
   body.appendChild(buildRail(line));
-  body.appendChild(buildScope(line, section));
+  body.appendChild(buildTools(line));
+  body.appendChild(buildSettings(line));
   const credits = buildCredits(line);
   if (credits) body.appendChild(credits);
   section.appendChild(body);
@@ -452,29 +532,211 @@ function buildCredits(line) {
   return box;
 }
 
-function buildScope(line, section) {
-  const box = el('div', 'scope');
-  if (line.focusFrom === null || line.focusTo === null) return box;
+/** 그 노선 섹션만 다시 그린다. 설정을 바꾸면 역 범위와 굵은 역이 함께 달라진다. */
+function rebuildSection(line) {
+  const old = document.querySelector('.line[data-slug="' + line.slug + '"]');
+  if (!old) return;
+  old.replaceWith(buildSection(line));
+  if (isOpen(line.slug)) refresh(line);
+}
 
-  const btn = el('button');
-  btn.type = 'button';
-  const note = el('span', 'scope-note', '');
-  const apply = () => {
+function buildTools(line) {
+  const box = el('div', 'scope');
+  const focus = focusOf(line);
+
+  if (focus) {
+    const btn = el('button');
+    btn.type = 'button';
     btn.textContent = isFull(line.slug)
       ? '관심 구간만 보기'
       : '전 구간 보기 (' + line.stations.length + '역)';
-  };
-  btn.addEventListener('click', () => {
-    toggleIn(view.full, line.slug);
-    apply();
-    const rail = section.querySelector('.rail');
-    rail.replaceWith(buildRail(line));
-    refresh(line);
+    btn.addEventListener('click', () => {
+      toggleIn(view.full, line.slug);
+      rebuildSection(line);
+    });
+    box.appendChild(btn);
+  }
+
+  const setBtn = el('button', null, openSettings.has(line.slug) ? '구간 설정 닫기' : '구간 설정');
+  setBtn.type = 'button';
+  setBtn.addEventListener('click', () => {
+    if (openSettings.has(line.slug)) openSettings.delete(line.slug);
+    else openSettings.add(line.slug);
+    rebuildSection(line);
   });
-  apply();
-  box.appendChild(btn);
-  box.appendChild(note);
+  box.appendChild(setBtn);
   return box;
+}
+
+/**
+ * 관심 구간과 주요 역을 고르는 자리.
+ *
+ * 고른 값은 이 브라우저에만 남는다. 프리셋과 같아지면 저장에서 아예 빼서, 나중에 프리셋이
+ * 바뀌면 손대지 않은 노선은 새 프리셋을 따라가게 한다.
+ */
+function buildSettings(line) {
+  const box = el('div', 'set');
+  box.hidden = !openSettings.has(line.slug);
+  if (box.hidden) return box;
+
+  const focus = focusOf(line) || { from: 0, to: line.stations.length - 1 };
+
+  const row = el('div', 'set-row');
+  row.appendChild(el('span', 'set-label', '관심 구간'));
+  const from = stationSelect(line, focus.from);
+  const to = stationSelect(line, focus.to);
+  const onPick = () => {
+    view.focus[line.slug] = [line.stations[from.selectedIndex], line.stations[to.selectedIndex]];
+    saveView();
+    rebuildSection(line);
+  };
+  from.addEventListener('change', onPick);
+  to.addEventListener('change', onPick);
+  row.appendChild(from);
+  row.appendChild(document.createTextNode('~'));
+  row.appendChild(to);
+
+  const reset = el('button', null, '기본값');
+  reset.type = 'button';
+  reset.addEventListener('click', () => {
+    delete view.focus[line.slug];
+    delete view.key[line.slug];
+    saveView();
+    rebuildSection(line);
+  });
+  row.appendChild(reset);
+  box.appendChild(row);
+
+  const keyRow = el('div', 'set-row');
+  keyRow.appendChild(el('span', 'set-label', '주요 역'));
+  const keys = el('div', 'set-keys');
+  const chosen = keysOf(line);
+  // 관심 구간 밖의 역은 어차피 안 보이므로 고를 것도 없다.
+  for (let i = focus.from; i <= focus.to; i++) {
+    const name = line.stations[i];
+    const chip = el('button', null, name);
+    chip.type = 'button';
+    chip.setAttribute('aria-pressed', String(chosen.includes(name)));
+    chip.addEventListener('click', () => {
+      const next = chosen.includes(name) ? chosen.filter(s => s !== name) : [...chosen, name];
+      view.key[line.slug] = next;
+      saveView();
+      rebuildSection(line);
+    });
+    keys.appendChild(chip);
+  }
+  keyRow.appendChild(keys);
+  box.appendChild(keyRow);
+
+  box.appendChild(el('p', 'set-note', '고른 값은 이 브라우저에만 남습니다.'));
+  return box;
+}
+
+function stationSelect(line, selected) {
+  const select = document.createElement('select');
+  line.stations.forEach((name, i) => {
+    const option = document.createElement('option');
+    option.value = name;
+    option.textContent = name;
+    option.selected = i === selected;
+    select.appendChild(option);
+  });
+  return select;
+}
+
+/* ---------- 노선 고르기 ---------- */
+
+/**
+ * 고른 노선 목록을 이 브라우저의 것으로 만든다.
+ *
+ * 그 전까지는 `view.lines` 가 비어 있어 프리셋을 그대로 따른다. 한 번이라도 손대면 그
+ * 시점의 목록을 복사해 두고 이후로는 프리셋과 무관해진다.
+ */
+function ownLines() {
+  if (!view.lines) view.lines = chosenSlugs().slice();
+  return view.lines;
+}
+
+function toggleLine(slug) {
+  const list = ownLines();
+  const i = list.indexOf(slug);
+  if (i < 0) {
+    list.push(slug);
+  } else {
+    list.splice(i, 1);
+    // 안 보이는 노선을 계속 폴링해 예산을 깎지 않도록 펼침 상태도 함께 걷는다.
+    const open = view.open.indexOf(slug);
+    if (open >= 0) view.open.splice(open, 1);
+  }
+  saveView();
+  renderAll();
+}
+
+function moveLine(slug, delta) {
+  const list = ownLines();
+  const i = list.indexOf(slug);
+  const j = i + delta;
+  if (i < 0 || j < 0 || j >= list.length) return;
+  list.splice(j, 0, list.splice(i, 1)[0]);
+  saveView();
+  renderAll();
+}
+
+function renderPicker() {
+  const box = document.getElementById('pick');
+  const chosen = chosenSlugs();
+  const rows = el('div', 'pick-list');
+  chosen.forEach((slug, i) => rows.appendChild(pickRow(bySlug.get(slug), true, i, chosen.length)));
+  lines.filter(l => !chosen.includes(l.slug)).forEach(l => rows.appendChild(pickRow(l, false)));
+
+  const foot = el('div', 'pick-foot');
+  const reset = el('button', null, '기본 설정으로 되돌리기');
+  reset.type = 'button';
+  reset.addEventListener('click', () => {
+    if (!confirm('고른 노선과 구간 설정을 지우고 기본 설정으로 돌아갑니다.')) return;
+    view = { lines: null, open: chosenDefaultOpen(), full: [], focus: {}, key: {} };
+    saveView();
+    renderAll();
+  });
+  foot.appendChild(reset);
+
+  box.replaceChildren(
+    el('p', 'pick-note', '보여줄 노선과 순서를 고릅니다. 펼친 노선만 실시간 위치를 받아옵니다.'),
+    rows,
+    foot,
+  );
+}
+
+function pickRow(line, on, index, total) {
+  const row = el('div', on ? 'pick-row' : 'pick-row off');
+  const dot = el('span', 'dot');
+  dot.style.background = line.color;
+  row.appendChild(dot);
+  row.appendChild(el('span', 'pick-name', line.name));
+
+  if (on) {
+    row.appendChild(moveButton(line, '↑', -1, index === 0));
+    row.appendChild(moveButton(line, '↓', 1, index === total - 1));
+  }
+  const toggle = el('button', null, on ? '숨기기' : '보이기');
+  toggle.type = 'button';
+  toggle.addEventListener('click', () => toggleLine(line.slug));
+  row.appendChild(toggle);
+  return row;
+}
+
+function moveButton(line, label, delta, disabled) {
+  const btn = el('button', null, label);
+  btn.type = 'button';
+  btn.disabled = disabled;
+  btn.title = delta < 0 ? '위로' : '아래로';
+  btn.addEventListener('click', () => moveLine(line.slug, delta));
+  return btn;
+}
+
+/** 처음 방문한 것과 같은 펼침 상태. 첫 노선만 펼친다. */
+function chosenDefaultOpen() {
+  return preset.slice(0, 1);
 }
 
 /* ---------- 데이터 ---------- */
@@ -488,9 +750,11 @@ function describeAge(iso) {
 
 function renderBudget() {
   const box = document.getElementById('budget');
-  const open = lines.filter(l => isOpen(l.slug) && l.budgeted).length;
+  // 1호선 경인과 경부처럼 갈라 놓은 뷰는 API 로 한 노선이라 함께 받아 온다. 펼친 수가
+  // 아니라 실제로 나가는 호출 수를 세야 하므로 API 노선명으로 묶는다.
+  const open = new Set(visibleLines().filter(l => isOpen(l.slug) && l.budgeted).map(l => l.apiName));
   const parts = ['오늘 서울시 API ' + budget.apiCallCount + ' / ' + budget.apiCallBudget + '회'];
-  if (open > 1) parts.push('펼친 노선이 ' + open + '개라 갱신 한 번에 ' + open + '회씩 나갑니다');
+  if (open.size > 1) parts.push('갱신 한 번에 ' + open.size + '회씩 나갑니다');
   box.textContent = parts.join('. ');
 }
 
@@ -515,12 +779,23 @@ async function refresh(line) {
 }
 
 function refreshOpen() {
-  for (const line of lines) {
+  for (const line of visibleLines()) {
     if (isOpen(line.slug)) refresh(line);
   }
 }
 
+/**
+ * 환승 데이터는 정적이라 노선당 한 번만 받는다. 노선도를 그릴 때 필요하므로 그리기 전에
+ * 받아 두고, 보이지 않는 노선은 받지 않는다 - 전 노선을 담고 나면 첫 화면에서 그만큼의
+ * 요청이 한꺼번에 나간다. 환승역이 없는 노선은 null 로 표시해 두 번 묻지 않는다.
+ */
+async function ensureTransfers() {
+  const missing = visibleLines().filter(l => !(l.slug in transfersByLine));
+  await Promise.all(missing.map(l => loadTransfers(l).catch(() => {})));
+}
+
 async function loadTransfers(line) {
+  transfersByLine[line.slug] = null;
   const res = await fetch('/api/lines/' + line.slug + '/transfers', { cache: 'no-store' });
   if (!res.ok) return;
   const data = await res.json();
@@ -531,25 +806,37 @@ async function loadTransfers(line) {
   };
 }
 
+async function renderAll() {
+  await ensureTransfers();
+  document.getElementById('lines').replaceChildren(...visibleLines().map(buildSection));
+  renderPicker();
+  renderBudget();
+  refreshOpen();
+}
+
 async function boot() {
   loadView();
   const res = await fetch('/api/lines', { cache: 'no-store' });
   const data = await res.json();
   lines = data.lines;
+  bySlug = new Map(lines.map(l => [l.slug, l]));
+  preset = (data.preset || []).filter(slug => bySlug.has(slug));
+  if (preset.length === 0) preset = lines.map(l => l.slug);
   transferColors = data.transferColors || {};
   budget = { apiCallBudget: data.apiCallBudget, apiCallCount: data.apiCallCount };
 
   // 저장된 것이 없으면 첫 노선만 펼친다. 펼친 노선 수만큼 호출 예산이 나가므로
   // 전부 펼친 채로 시작하지 않는다.
-  if (view.open.length === 0) view.open = [lines[0].slug];
+  if (view.open.length === 0) view.open = chosenDefaultOpen();
 
-  // 환승 데이터는 정적이라 한 번만 받는다. 노선도를 그릴 때 필요하므로 먼저 받는다.
-  await Promise.all(lines.map(l => loadTransfers(l).catch(() => {})));
+  const pickToggle = document.getElementById('pick-toggle');
+  const pick = document.getElementById('pick');
+  pickToggle.addEventListener('click', () => {
+    pick.hidden = !pick.hidden;
+    pickToggle.textContent = pick.hidden ? '노선 고르기' : '노선 고르기 닫기';
+  });
 
-  const box = document.getElementById('lines');
-  box.replaceChildren(...lines.map(buildSection));
-  renderBudget();
-  refreshOpen();
+  await renderAll();
 }
 
 boot();

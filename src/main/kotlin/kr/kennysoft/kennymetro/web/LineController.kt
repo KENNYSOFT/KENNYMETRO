@@ -23,6 +23,7 @@ class LineController(
     @GetMapping("/api/lines")
     fun lines(): LinesResponse = LinesResponse(
         lines = ArrayList(catalog.all().map { it.toView() }),
+        preset = ArrayList(catalog.preset()),
         transferColors = LinkedHashMap(catalog.transferColors()),
         apiCallBudget = properties.dailyCallBudget,
         apiCallCount = trainPositionService.apiCallCount(),
@@ -31,6 +32,8 @@ class LineController(
     private fun Line.toView() = LineView(
         slug = slug,
         name = name,
+        // 화면이 호출 수를 셀 때 쓴다. 이 값이 같은 뷰를 여럿 펼쳐도 호출은 한 번이다.
+        apiName = apiName,
         color = color,
         circular = circular,
         upLabel = upLabel,
@@ -47,6 +50,8 @@ class LineController(
 
 data class LinesResponse(
     val lines: List<LineView>,
+    /** 아직 아무것도 고르지 않은 브라우저가 보여줄 노선과 그 순서. */
+    val preset: List<String>,
     /** 환승 문 위치에 노선 동그라미를 붙이는 데 쓴다. */
     val transferColors: Map<String, String>,
     val apiCallBudget: Int,
@@ -56,6 +61,7 @@ data class LinesResponse(
 data class LineView(
     val slug: String,
     val name: String,
+    val apiName: String,
     val color: String,
     val circular: Boolean,
     val upLabel: String,

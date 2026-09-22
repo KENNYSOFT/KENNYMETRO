@@ -22,6 +22,15 @@ enum class LineSource {
 data class Line(
     val slug: String,
     val name: String,
+    /**
+     * 실시간 API 에 넘길 노선명.
+     *
+     * <p>
+     * 화면에 세우는 이름과 가르는 것은 분기 때문이다. 1호선은 구로에서 인천과 신창으로
+     * 갈려 역을 한 줄로 세울 수 없어 계통마다 뷰를 따로 두는데, API 는 그것을 구분하지
+     * 않고 "1호선" 하나로 전체 열차를 준다. 이 값이 같은 뷰끼리는 받아 온 것을 나눠 쓴다.
+     */
+    val apiName: String,
     val color: String,
     val source: LineSource,
     val circular: Boolean,
@@ -34,6 +43,9 @@ data class Line(
     val keyStations: List<String>,
     val fleet: Fleet?,
 ) {
+
+    /** 실시간 위치를 공유하는 단위. 이 값이 같으면 호출도 캐시도 한 벌이다. */
+    val cacheKey: String get() = "$source:$apiName"
 
     /** 역이 노선에서 몇 번째인지. 모르는 역이면 null. */
     fun indexOf(station: String): Int? = stations.indexOf(station).takeIf { it >= 0 }

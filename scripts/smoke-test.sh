@@ -112,6 +112,11 @@ for slug in shinbundang line2 line9 suinbundang everline; do
 done
 # 편성 차수는 신분당선에만 있다. 이 값이 빠지면 화면에서 색 구분이 통째로 사라진다.
 echo "$LINES" | grep -q '"generations":\[' || fail "편성 차수가 응답에 없다: $LINES"
+# 프리셋이 없으면 처음 방문한 화면이 통째로 빈다.
+echo "$LINES" | grep -q '"preset":\["shinbundang"' || fail "프리셋이 응답에 없다: $LINES"
+# 1호선은 계통마다 뷰를 나누되 API 노선명은 하나다. 이 값이 어긋나면 호출이 배로 나간다.
+[ "$(echo "$LINES" | grep -o '"apiName":"1호선"' | wc -l)" -eq 2 ] \
+  || fail "1호선 뷰 둘이 같은 API 노선을 가리키지 않는다: $LINES"
 
 # 호출 원장. 위 trains 요청으로 서울시 API 를 한 번 불렀으니 그 한 번이 파일에 남아야 한다.
 # 재배포해도 예산 표시가 이어지게 하는 장치라 실제로 파일이 생기는지까지 본다.
