@@ -562,7 +562,7 @@ function buildTransferSide(line, doors, side) {
   const directions = [...new Set(doors.map(d => d.trainDirection))];
   const named = directions.length > 1 || (directions[0] != null && !isOwnDirection(line, directions[0]));
   for (const direction of directions) {
-    if (named && direction) cell.appendChild(el('div', 'tr-train', direction + ' 방면'));
+    if (named && direction) cell.appendChild(el('div', 'tr-train', directionName(direction)));
     for (const g of mergeDoors(doors.filter(d => d.trainDirection === direction))) {
       cell.appendChild(buildTargetCell(g.targets));
       cell.appendChild(buildDoorCell(g.spots));
@@ -571,10 +571,20 @@ function buildTransferSide(line, doors, side) {
   return cell;
 }
 
-/** 그 칸의 이름. 순환선은 방면 대신 외선과 내선이다. */
+/**
+ * 2호선의 내선과 외선이 도는 쪽. 이름만으로는 어느 쪽으로 도는지 매번 떠올려야 해서 화면에 적을
+ * 때마다 함께 적는다. 우측통행이라 안쪽 선로의 내선이 시계 방향이다(DESIGN.md 2.2.1).
+ */
+const CIRCLE_NAMES = { '내선': '내선순환(시계 방향)', '외선': '외선순환(반시계 방향)' };
+
+/** 방면 이름. 2호선의 내선과 외선은 방면이 아니라 도는 쪽이라 방면을 붙이지 않고 그것을 적는다. */
+function directionName(label) {
+  return CIRCLE_NAMES[label] || label + ' 방면';
+}
+
+/** 그 칸의 이름. */
 function sideName(line, side) {
-  const label = side === 'up' ? line.upLabel : line.downLabel;
-  return line.circular ? label : label + ' 방면';
+  return directionName(side === 'up' ? line.upLabel : line.downLabel);
 }
 
 /**
@@ -599,7 +609,7 @@ function buildTargetCell(targets) {
       item.appendChild(document.createTextNode(name.trim()));
       cell.appendChild(item);
     });
-    if (target.direction) cell.appendChild(document.createTextNode(' ' + target.direction + ' 방면'));
+    if (target.direction) cell.appendChild(document.createTextNode(' ' + directionName(target.direction)));
   });
   return cell;
 }
@@ -721,7 +731,7 @@ function buildLegend(line) {
   const p = el('p', 'legend');
   // 순환선은 방면 대신 외선과 내선으로 갈린다.
   p.appendChild(document.createTextNode(line.circular
-    ? '↑ 왼쪽은 ' + line.upLabel + ', ↓ 오른쪽은 ' + line.downLabel + ' 열차입니다. '
+    ? '↑ 왼쪽은 ' + directionName(line.upLabel) + ', ↓ 오른쪽은 ' + directionName(line.downLabel) + ' 열차입니다. '
     : '↑ 왼쪽은 ' + line.upLabel + ' 방면, ↓ 오른쪽은 ' + line.downLabel + ' 방면입니다. '));
   if (transfersByLine[line.slug]) {
     p.appendChild(document.createTextNode('밑줄 친 역 이름을 누르면 환승 문 위치가 타고 온 열차 쪽에 열립니다.'));
