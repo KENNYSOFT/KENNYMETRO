@@ -17,7 +17,7 @@ import kotlin.math.abs
 @Component
 class LineCatalog(properties: MetroProperties) {
 
-    private val lines: List<Line> = withSiblingAnchors(properties.lines.map { it.toLine() })
+    private val lines: List<Line> = withSiblingAnchors(properties.lines.map { it.toLine(properties.timetableLines) })
     private val bySlug: Map<String, Line> = lines.associateBy { it.slug }
     private val colors: Map<String, String> = properties.transferColors
     private val preset: List<String> = properties.preset
@@ -47,6 +47,12 @@ class LineCatalog(properties: MetroProperties) {
         transferNames.forEach { (one, other) ->
             require(one.isNotBlank()) { "transfer-names 의 키가 비었다. 키를 대괄호로 감쌌는지 볼 것: $transferNames" }
             require(one in everyStation && other in everyStation) { "transfer-names 가 어느 노선에도 없는 역을 가리킨다: $one -> $other" }
+        }
+        properties.timetableLines.keys.forEach { name ->
+            require(name.isNotBlank()) { "timetable-lines 의 키가 비었다. 키를 대괄호로 감쌌는지 볼 것: ${properties.timetableLines}" }
+            require(lines.any { it.source == LineSource.SEOUL && it.apiName == name }) {
+                "timetable-lines 가 서울시 API 로 받는 노선이 아닌 것을 가리킨다: $name"
+            }
         }
     }
 
@@ -85,7 +91,7 @@ class LineCatalog(properties: MetroProperties) {
 
     fun bySlug(slug: String): Line? = bySlug[slug]
 
-    private fun LineConfig.toLine(): Line {
+    private fun LineConfig.toLine(timetableLines: Map<String, String>): Line {
         require(stations.isNotEmpty()) { "$slug: 역 목록이 비었다" }
         require(stations.size == stations.distinct().size) {
             "$slug: 역이 중복됐다: ${stations.groupBy { it }.filter { it.value.size > 1 }.keys}"
@@ -123,9 +129,11 @@ class LineCatalog(properties: MetroProperties) {
             slug = slug,
             name = name,
             apiName = apiName ?: name,
+            timetableLine = timetableLines[apiName ?: name],
             color = color,
             source = source,
             circular = circular,
+            updnLineReversed = updnLineReversed,
             upLabel = upLabel,
             downLabel = downLabel,
             stations = stations,

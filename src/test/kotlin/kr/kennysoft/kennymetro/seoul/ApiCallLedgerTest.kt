@@ -86,6 +86,7 @@ class ApiCallLedgerTest : FreeSpec({
 private fun properties(logPath: Path) = SeoulSubwayProperties(
     apiKey = "test-key",
     baseUrl = "http://localhost",
+    timetableBaseUrl = "http://localhost",
     cacheTtl = Duration.ofSeconds(70),
     requestTimeout = Duration.ofSeconds(5),
     dailyCallBudget = 1000,

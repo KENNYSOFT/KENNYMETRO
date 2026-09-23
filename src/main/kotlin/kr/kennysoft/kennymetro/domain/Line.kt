@@ -31,9 +31,24 @@ data class Line(
      * 않고 "1호선" 하나로 전체 열차를 준다. 이 값이 같은 뷰끼리는 받아 온 것을 나눠 쓴다.
      */
     val apiName: String,
+    /**
+     * 서울시 역별 시간표에 이 노선이 적힌 이름(`03호선`). 시간표가 없는 노선이면 null 이다.
+     *
+     * <p>
+     * 종착역을 믿을 수 없는 열차를 이 시간표로 다시 본다(DESIGN.md 2.2.2). 1~9호선에만 있다.
+     */
+    val timetableLine: String?,
     val color: String,
     val source: LineSource,
     val circular: Boolean,
+    /**
+     * `updnLine` 0(상행)이 역 목록의 뒤쪽을 가리키는지.
+     *
+     * <p>
+     * 대부분의 노선은 0 이 목록의 앞쪽이다. 우이신설선과 2호선 신정지선은 0 이 뒤쪽(신설동,
+     * 까치산)으로 오고, 2호선 순환선은 0 이 내선이라 역 순서가 커지는 쪽이다.
+     */
+    val updnLineReversed: Boolean,
     val upLabel: String,
     val downLabel: String,
     val stations: List<String>,
@@ -90,6 +105,19 @@ data class Line(
 
     /** 그 자리에 열차가 서는 역이 있는지. 목록 밖이거나 열차가 다니지 않는 역이면 false. */
     fun servedAt(index: Int): Boolean = index in stations.indices && stations[index] !in noService
+
+    /**
+     * 열차가 그 자리에서 돌아갈 수 있는지. 목록의 끝, 열차가 다니지 않는 역의 바로 옆, 평소 종착역이다.
+     * 그런 역에서 회차를 기다리는 열차는 `updnLine` 이 직전 운행의 값이라 종착역과 어긋나 있다.
+     */
+    fun turnsBackAt(index: Int): Boolean =
+        !servedAt(index - 1) || !servedAt(index + 1) || stations[index] in termini
+
+    /** `updnLine` 이 가리키는 쪽. */
+    fun directionOf(updnLine: String): Direction {
+        val up = if (updnLineReversed) "1" else "0"
+        return if (updnLine == up) Direction.UP else Direction.DOWN
+    }
 
     /** 그 종착역으로 가는 열차가 이 뷰에서 어디를 향하고 어떤 운행인지. 모르는 종착역이면 null. */
     fun destinationOf(name: String): Destination? {

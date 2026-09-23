@@ -60,6 +60,7 @@ start_app() {
   SERVER_PORT="$PORT" \
   SEOUL_SUBWAY_API_KEY=smoke-key \
   SEOUL_SUBWAY_BASE_URL="http://127.0.0.1:$STUB_PORT" \
+  SEOUL_SUBWAY_TIMETABLE_BASE_URL="http://127.0.0.1:$STUB_PORT" \
   KENNYMETRO_CALL_LOG="$LEDGER" \
     "$BINARY" > "$LOG" 2>&1 &
   APP_PID=$!
@@ -84,7 +85,7 @@ stop_all() {
 # 2라운드에서 이어받기를 볼 때 쓴다. 그 사이 자정을 넘기면 원장의 날짜가 갈린다.
 DAY_BEFORE=$(date '+%Y-%m-%d')
 
-# 1라운드: 열차가 있는 응답. 파싱, 종착 처리 열차 제외, 회차 방향 판정까지 본다.
+# 1라운드: 열차가 있는 응답. 파싱, 종착 처리 열차 제외, 회차 방향 판정, 시간표로 종착역을 다시 보는 것까지 본다.
 echo "1라운드: 열차 있는 응답"
 start_stub trains
 start_app
@@ -94,6 +95,16 @@ echo "$BODY" | grep -q '"trainNo":"11"' || fail "11번 열차가 응답에 없�
 echo "$BODY" | grep -q '"trainNo":"13"' && fail "종착 처리 중인 13번이 응답에 들어갔다: $BODY"
 echo "$BODY" | grep -q '"trainNo":"12","currentStation":"광교","destination":"신사","direction":"UP"' \
   || fail "회차 대기 열차의 방향이 UP 이 아니다: $BODY"
+
+# 종착역이 다음 운행 것으로 앞서 바뀐 열차. 시간표가 있는 노선은 stub 의 동대입구 하행 시간표로
+# 종착역을 되돌리고, 없는 노선은 updnLine 으로 방향만 정하고 종착역을 비운다. 시간표 응답 DTO 도
+# 실시간 위치처럼 native 에서만 역직렬화가 깨질 수 있어 바이너리로 본다.
+LINE3=$(curl -sf "$BASE/api/lines/line3/trains") || fail "3호선 열차 목록을 받지 못했다"
+echo "$LINE3" | grep -q '"trainNo":"3423","currentStation":"동대입구","destination":"약수","direction":"DOWN"' \
+  || fail "시간표로 종착역을 되돌리지 못했다: $LINE3"
+UISINSEOL=$(curl -sf "$BASE/api/lines/uisinseol/trains") || fail "우이신설선 열차 목록을 받지 못했다"
+echo "$UISINSEOL" | grep -q '"trainNo":"1147","currentStation":"가오리","destination":null,"direction":"UP"' \
+  || fail "시간표가 없는 노선에서 종착역을 비우고 updnLine 으로 방향을 정하지 못했다: $UISINSEOL"
 
 # 환승 데이터는 classpath 리소스라 native image 에 자동으로 실리지 않는다. 힌트를 빠뜨리면
 # JVM 에서는 멀쩡히 읽히고 바이너리에서만 파일이 없는 것처럼 빈 목록이 된다.
@@ -128,11 +139,12 @@ echo "$LINES" | grep -q '"preset":\["shinbundang"' || fail "프리셋이 응답�
 [ "$(echo "$LINES" | grep -o '"apiName":"1호선"' | wc -l)" -eq 2 ] \
   || fail "1호선 뷰 둘이 같은 API 노선을 가리키지 않는다: $LINES"
 
-# 호출 원장. 위 trains 요청으로 서울시 API 를 한 번 불렀으니 그 한 번이 파일에 남아야 한다.
+# 호출 원장. 위 trains 요청으로 서울시 API 를 여섯 번 불렀으니 그것이 파일에 남아야 한다. 실시간
+# 위치가 세 노선에 한 번씩, 3423 을 다시 보느라 역 코드 한 번과 평일 시간표 상하행 두 번이다.
 # 재배포해도 예산 표시가 이어지게 하는 장치라 실제로 파일이 생기는지까지 본다.
-echo "$LINES" | grep -q '"apiCallCount":1' || fail "호출 수가 응답에 없다: $LINES"
+echo "$LINES" | grep -q '"apiCallCount":6' || fail "호출 수가 응답에 없다: $LINES"
 [ -f "$LEDGER" ] || fail "호출 원장 파일이 생기지 않았다: $LEDGER"
-grep -q "^$DAY_BEFORE 1$" "$LEDGER" || fail "오늘 호출 수가 원장에 없다: $(cat "$LEDGER")"
+grep -q "^$DAY_BEFORE 6$" "$LEDGER" || fail "오늘 호출 수가 원장에 없다: $(cat "$LEDGER")"
 
 # favicon 은 XML 이라 주석에 붙임표 두 개만 들어가도 브라우저가 렌더링을 거부한다.
 # 인라인으로 넣어 보면 HTML 파서가 관대해서 그냥 지나가므로 파일 그대로 파싱해 본다.
@@ -160,10 +172,10 @@ BODY=$(curl -sf "$BASE/api/lines/shinbundang/trains") || fail "빈 목록 응답
 echo "$BODY" | grep -q '"trains":\[\]' || fail "빈 목록이 아니다: $BODY"
 echo "$BODY" | grep -q '"line":"shinbundang"' || fail "노선 표시가 빠졌다: $BODY"
 
-# 앱을 껐다 켰으므로 호출 수는 1 에서 이어져 2 여야 한다. 원장을 안 읽으면 여기서 1 이 된다.
+# 앱을 껐다 켰으므로 호출 수는 6 에서 이어져 7 이어야 한다. 원장을 안 읽으면 여기서 1 이 된다.
 LINES=$(curl -sf "$BASE/api/lines") || fail "노선 목록을 받지 못했다"
 if [ "$(date '+%Y-%m-%d')" = "$DAY_BEFORE" ]; then
-  echo "$LINES" | grep -q '"apiCallCount":2' || fail "재기동 후 호출 수를 이어받지 못했다: $LINES"
+  echo "$LINES" | grep -q '"apiCallCount":7' || fail "재기동 후 호출 수를 이어받지 못했다: $LINES"
 else
   echo "  자정을 넘겨 이어받기 확인은 건너뛴다"
 fi

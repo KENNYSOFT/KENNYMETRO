@@ -492,8 +492,10 @@ function trainChip(line, t) {
     title.push(t.fleet);
   }
   if (kind) title.push(kind.label + ': ' + kind.note);
+  // 실시간 종착역이 진행 방향과 어긋나고 시간표로도 찾지 못한 열차. 방향만 믿을 수 있다.
+  if (t.destination == null) title.push('행선지 불명: 실시간 정보의 종착역이 진행 방향과 맞지 않습니다');
   if (t.isExpress) chip.appendChild(el('span', 'exp', '급행'));
-  chip.appendChild(el('span', 'dst', t.destination + '행'));
+  chip.appendChild(el('span', 'dst', t.destination == null ? '행선지 불명' : t.destination + '행'));
   if (t.isLastTrain) chip.appendChild(el('span', 'tag', '막차'));
   chip.appendChild(el('span', 'no', t.trainNo));
   if (title.length) chip.title = title.join('\n');

@@ -244,6 +244,30 @@ class LineCatalogTest : FreeSpec({
         error.message shouldContain "termini"
     }
 
+    "시간표가 있다고 적은 노선이 서울시 API 로 받는 노선이 아니면 기동이 실패한다" {
+        // given - api-name 과 어긋나 조용히 빠지면 그 노선은 종착역이 어긋나도 시간표를 보지 않는다.
+        val broken = MetroProperties(
+            lines = listOf(
+                LineConfig(
+                    slug = "test",
+                    name = "테스트선",
+                    color = "#000000",
+                    source = LineSource.SEOUL,
+                    upLabel = "위",
+                    downLabel = "아래",
+                    stations = listOf("가", "나"),
+                )
+            ),
+            timetableLines = mapOf("테스트" to "01호선"),
+        )
+
+        // when
+        val error = shouldThrow<IllegalArgumentException> { LineCatalog(broken) }
+
+        // then - 어느 설정이 틀렸는지 알려야 한다.
+        error.message shouldContain "timetable-lines"
+    }
+
     "역이 중복되면 기동이 실패한다" {
         // given
         val broken = MetroProperties(

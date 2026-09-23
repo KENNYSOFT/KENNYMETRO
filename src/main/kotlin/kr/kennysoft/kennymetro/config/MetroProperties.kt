@@ -35,6 +35,11 @@ data class MetroProperties(
      * 대조할 때 같은 역으로 본다.
      */
     val transferNames: Map<String, String> = emptyMap(),
+    /**
+     * 서울시 역별 시간표가 있는 노선. 키가 실시간 API 의 노선명(`api-name`), 값이 시간표 API 의
+     * 노선 표기(`03호선`)다. 여기 없는 노선은 종착역이 의심스러워도 시간표를 부르지 않는다.
+     */
+    val timetableLines: Map<String, String> = emptyMap(),
 )
 
 data class LineConfig(
@@ -46,6 +51,11 @@ data class LineConfig(
     val source: LineSource,
     /** 순환선은 종착역으로 방향을 정할 수 없어 `updnLine` 을 그대로 쓴다. 2호선만 해당한다. */
     val circular: Boolean = false,
+    /**
+     * `updnLine` 0(상행)이 역 목록의 뒤쪽을 가리키는 노선. 대부분 0 이 앞쪽이고, 우이신설선과
+     * 2호선 신정지선은 반대로 온다. 2호선 순환선도 0 이 내선이라 역 순서가 커지는 쪽이다.
+     */
+    val updnLineReversed: Boolean = false,
     /** `updnLine` 0 과 1 에 붙일 이름. 화면에서 up 이 왼쪽이다. */
     val upLabel: String,
     val downLabel: String,

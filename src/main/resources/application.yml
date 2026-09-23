@@ -43,6 +43,9 @@ seoul-subway:
   # 미주입 시 기동이 실패한다.
   api-key: ${SEOUL_SUBWAY_API_KEY}
   base-url: http://swopenapi.seoul.go.kr/api/subway
+  # 역별 시간표. 종착역이 진행 방향과 어긋나는 열차를 다시 볼 때만 부른다(DESIGN.md 2.2.2).
+  # 실시간 API 와 다른 서비스지만 같은 인증키로 부른다.
+  timetable-base-url: http://openapi.seoul.go.kr:8088
   # 하루 1,000회 제한이라 운행시간 19시간을 나누면 70초에 1회다. 활용사례 갤러리에
   # 등록해 제한이 풀리면 줄일 수 있다.
   cache-ttl: 70s

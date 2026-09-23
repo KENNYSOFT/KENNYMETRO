@@ -13,6 +13,8 @@ import java.time.Duration
 data class SeoulSubwayProperties(
     val apiKey: String,
     val baseUrl: String,
+    /** 역별 시간표 API 주소. 실시간 API 와 호스트가 다르고 인증키는 같은 것을 쓴다. */
+    val timetableBaseUrl: String,
     val cacheTtl: Duration,
     val requestTimeout: Duration,
     /** 화면에 남은 예산을 보여주는 데만 쓴다. 서버가 이 값으로 호출을 막지는 않는다. */

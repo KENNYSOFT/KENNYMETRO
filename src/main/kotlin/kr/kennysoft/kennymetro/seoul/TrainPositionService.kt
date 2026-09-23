@@ -3,7 +3,9 @@ package kr.kennysoft.kennymetro.seoul
 import kr.kennysoft.kennymetro.domain.Line
 import kr.kennysoft.kennymetro.domain.LineCatalog
 import kr.kennysoft.kennymetro.domain.LineSource
+import kr.kennysoft.kennymetro.domain.Recheck
 import kr.kennysoft.kennymetro.domain.Train
+import kr.kennysoft.kennymetro.domain.needsRecheck
 import kr.kennysoft.kennymetro.domain.tidy
 import kr.kennysoft.kennymetro.domain.toTrain
 import kr.kennysoft.kennymetro.everline.EverlineClient
@@ -33,6 +35,7 @@ import java.util.concurrent.locks.ReentrantLock
 class TrainPositionService(
     private val seoulClient: SeoulSubwayClient,
     private val everlineClient: EverlineClient,
+    private val timetable: TimetableLookup,
     private val properties: SeoulSubwayProperties,
     private val ledger: ApiCallLedger,
     private val catalog: LineCatalog,
@@ -110,13 +113,27 @@ class TrainPositionService(
             ledger.record()
             val raw = seoulClient.findPositions(line.apiName).tidy(catalog.stationNames)
             reportUnknown(line, raw.flatMap { listOf(it.statnNm, it.statnTnm) })
-            Positions(raw.size) { view -> raw.mapNotNull { it.toTrain(view) } }
+            val rechecks = recheck(line, raw)
+            Positions(raw.size) { view -> raw.mapNotNull { it.toTrain(view, rechecks[it.trainNo]) } }
         }
 
         LineSource.EVERLINE -> {
             val raw = everlineClient.findPositions()
             Positions(raw.size) { view -> raw.mapNotNull { it.toTrain(view) } }
         }
+    }
+
+    /**
+     * 노선 중간에서 종착역과 `updnLine` 이 어긋나는 열차를 시간표로 다시 본다(DESIGN.md 2.2.2).
+     *
+     * <p>
+     * 받아 올 때 한 번 정해 둔다. 뷰로 옮기는 것은 요청마다 다시 하므로 거기서 시간표를 부르지
+     * 않는다. 같은 API 노선의 뷰 가운데 하나라도 어긋나 보이면 다시 본다.
+     */
+    private fun recheck(line: Line, raw: List<TrainPositionDto>): Map<String, Recheck> {
+        val views = catalog.all().filter { it.cacheKey == line.cacheKey }
+        return raw.filter { train -> views.any { train.needsRecheck(it) } }
+            .associate { it.trainNo to timetable.recheck(line, it) }
     }
 
     /**
