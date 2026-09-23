@@ -55,7 +55,7 @@ data class LineConfig(
     val keyStations: List<String> = emptyList(),
     /** 편성번호로 차량을 특정할 수 있는 노선에만 있다. */
     val fleet: FleetConfig? = null,
-    /** 이 노선 열차가 평소 가는 종착역. 비어 있으면 역 목록의 양 끝이다. */
+    /** 이 노선 열차가 평소 가는 종착역. 비어 있으면 역 목록의 양 끝이다. 순환선은 반드시 적는다. */
     val termini: List<String> = emptyList(),
     /**
      * 어느 뷰의 목록에도 없는 종착역과, 그 열차가 이 뷰를 떠나는 역. 1호선 서동탄행은

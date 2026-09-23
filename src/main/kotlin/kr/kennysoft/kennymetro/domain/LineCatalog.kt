@@ -93,6 +93,8 @@ class LineCatalog(properties: MetroProperties) {
         require(focus.isEmpty() || focus.size == 2) {
             "$slug: focus 는 [시작역, 끝역] 두 개여야 한다: $focus"
         }
+        // 적지 않으면 목록의 양 끝을 쓰는데, 순환선의 양 끝은 목록을 끊은 자리일 뿐이다.
+        require(!circular || termini.isNotEmpty()) { "$slug: 순환선은 평소 종착역(termini)을 적어야 한다" }
 
         fun indexOrFail(station: String, where: String): Int =
             stations.indexOf(station).takeIf { it >= 0 }

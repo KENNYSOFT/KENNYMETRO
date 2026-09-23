@@ -88,11 +88,16 @@ private fun TrainPositionDto.toLinearTrain(line: Line, currentIndex: Int): Train
  *
  * <p>
  * 지선 끝(신설동, 까치산)으로 가는 열차는 본선 뷰에 그리지 않는다. 그 열차는 지선 뷰가
- * 보여준다. 노선 끝이 없으므로 단축 운행도 없다.
+ * 보여준다.
+ *
+ * <p>
+ * 종착은 대부분 `성수종착` 으로 온다. 성수에서 운행이 바뀔 뿐 열차는 계속 돌므로 성수를 평소
+ * 종착역으로 두고, 그 밖의 역에서 끝나는 열차(신도림, 밤늦게 을지로입구와 홍대입구 등)는
+ * 단축으로 가린다(DESIGN.md 1.6).
  */
 private fun TrainPositionDto.toCircularTrain(line: Line): Train? {
     if (statnNm == statnTnm) return null
-    if (line.indexOf(statnTnm) == null) return null
+    val destinationIndex = line.indexOf(statnTnm) ?: return null
 
     return Train(
         trainNo = trainNo,
@@ -101,7 +106,7 @@ private fun TrainPositionDto.toCircularTrain(line: Line): Train? {
         direction = if (updnLine == "0") Direction.DOWN else Direction.UP,
         isLastTrain = lstcarAt == "1",
         isExpress = directAt == "1",
-        service = ServiceKind.NORMAL,
+        service = line.serviceAt(destinationIndex),
         fleet = line.fleet?.labelFor(trainNo),
     )
 }

@@ -38,12 +38,16 @@ class CircularTrainTest : FreeSpec({
         train.shouldBeNull()
     }
 
-    "순환선에는 노선 끝이 없어 단축 운행 표시를 하지 않는다" {
-        // given
-        val train = train(current = "강남", terminal = "성수종착", updnLine = "0")
+    "성수에서 끝나는 열차는 평소 운행이고 다른 역에서 끝나면 단축이다" {
+        // given - 성수종착은 성수에서 운행만 바뀌고 계속 돈다. 신도림에서 끝나는 열차는 차량기지로 들어간다.
+        val loop = train(current = "강남", terminal = "성수종착", updnLine = "0")
+        val toSindorim = train(current = "강남", terminal = "신도림종착", updnLine = "0")
+        val lateNight = train(current = "시청", terminal = "을지로입구", updnLine = "0")
 
         // when & then
-        train?.service shouldBe ServiceKind.NORMAL
+        loop?.service shouldBe ServiceKind.NORMAL
+        toSindorim?.service shouldBe ServiceKind.SHORT
+        lateNight?.service shouldBe ServiceKind.SHORT
     }
 
     "지선으로 들어가는 열차는 본선 뷰에 그리지 않고 지선 뷰가 보여준다" {

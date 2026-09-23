@@ -44,7 +44,8 @@ data class Line(
     val fleet: Fleet?,
     /**
      * 이 노선 열차가 평소 가는 종착역. 여기 없는 목록 안의 종착역은 그 사이면 단축, 바깥이면
-     * 연장이다. 수인분당선은 왕십리가 평소 종착이라 청량리행이 연장으로 잡힌다.
+     * 연장이다. 수인분당선은 왕십리가 평소 종착이라 청량리행이 연장으로 잡힌다. 순환선은 바깥이
+     * 없어 여기 없는 종착역이 모두 단축이다.
      */
     val termini: Set<String>,
     /**
@@ -98,7 +99,8 @@ data class Line(
 
     /** 목록 안의 역을 종착으로 하는 열차가 어떤 운행인지. */
     fun serviceAt(index: Int): ServiceKind {
-        if (circular || stations[index] in termini) return ServiceKind.NORMAL
+        if (stations[index] in termini) return ServiceKind.NORMAL
+        if (circular) return ServiceKind.SHORT
         return if (index < terminiIndices.min() || index > terminiIndices.max()) ServiceKind.EXTENSION else ServiceKind.SHORT
     }
 }

@@ -220,6 +220,30 @@ class LineCatalogTest : FreeSpec({
         error.message shouldContain "대괄호"
     }
 
+    "평소 종착역을 적지 않은 순환선은 기동이 실패한다" {
+        // given - 적지 않으면 목록의 양 끝을 쓰는데, 순환선의 양 끝은 목록을 끊은 자리라 열차 대부분이 단축으로 칠해진다.
+        val broken = MetroProperties(
+            listOf(
+                LineConfig(
+                    slug = "test",
+                    name = "테스트선",
+                    color = "#000000",
+                    source = LineSource.SEOUL,
+                    circular = true,
+                    upLabel = "외선",
+                    downLabel = "내선",
+                    stations = listOf("가", "나", "다"),
+                )
+            )
+        )
+
+        // when
+        val error = shouldThrow<IllegalArgumentException> { LineCatalog(broken) }
+
+        // then - 무엇을 적어야 하는지 알려야 한다.
+        error.message shouldContain "termini"
+    }
+
     "역이 중복되면 기동이 실패한다" {
         // given
         val broken = MetroProperties(
