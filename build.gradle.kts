@@ -30,7 +30,9 @@ dependencies {
 
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
     testImplementation("org.springframework.boot:spring-boot-starter-actuator-test")
-    testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
+    // Spring Boot 가 JUnit Platform 을 6 으로 고정하므로 러너도 JUnit 6 용을 쓴다. junit5 러너는 1.x 에 맞춰져 있다.
+    testImplementation("io.kotest:kotest-runner-junit6:6.2.5")
+    testImplementation("io.kotest:kotest-assertions-core:6.2.5")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
