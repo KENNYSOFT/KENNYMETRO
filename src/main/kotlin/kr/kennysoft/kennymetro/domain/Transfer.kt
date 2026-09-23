@@ -7,13 +7,20 @@ package kr.kennysoft.kennymetro.domain
  * 두 방면이 각각 null 일 수 있고 그 의미가 다르다. `trainDirection` 이 null 이면 지금 탄
  * 열차가 어느 쪽으로 가든 같은 문이라는 뜻이고(신분당선 시종착역인 신사가 그렇다),
  * `targetDirection` 이 null 이면 갈아타서 어느 쪽으로 가든 같은 문이라는 뜻이다.
+ *
+ * <p>
+ * 자리는 세 가지다. `car` 와 `door` 만 있으면 그 문 하나이고, `toCar` 와 `toDoor` 까지 있으면
+ * 앞 자리부터 그 자리까지 이어진 모든 문이다. 넷 다 null 이면 어느 문에서 내려도 된다. 뒤의
+ * 둘은 같은 승강장 건너편에서 갈아타는 역에서 나온다(4호선 한대앞에서 수인분당선이 그렇다).
  */
 data class TransferDoor(
     val trainDirection: String?,
     val targetLine: String,
     val targetDirection: String?,
-    val car: Int,
-    val door: Int,
+    val car: Int?,
+    val door: Int?,
+    val toCar: Int?,
+    val toDoor: Int?,
 )
 
 /**

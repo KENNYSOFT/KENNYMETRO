@@ -1,0 +1,13 @@
+# 환승역별 주의사항
+#
+# 출처와 라이선스. 파서가 이 키들을 읽어 화면에 그대로 띄운다. CC BY 조건이라 뺄 수 없다.
+# source-document: 수도권 전철 환승 정보/서울 지하철 6호선
+# source-revision: r69
+# source-url: https://namu.wiki/w/수도권 전철 환승 정보/서울 지하철 6호선
+# license: CC BY-NC-SA 2.0 KR
+# license-url: https://creativecommons.org/licenses/by-nc-sa/2.0/kr/
+#
+# 컬럼: 역,비고
+# 파서가 첫 쉼표 하나로만 가르므로 비고 안에는 쉼표를 써도 된다.
+역,비고
+신내,7-4 는 신내행을 타고 왔을 때의 자리다. 봉화산으로 돌아가는 단선 승강장이라 승강장 바닥에는 2-1 로 적혀 있다.

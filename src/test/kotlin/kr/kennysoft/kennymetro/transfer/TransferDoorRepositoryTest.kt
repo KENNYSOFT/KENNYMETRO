@@ -3,7 +3,8 @@ package kr.kennysoft.kennymetro.transfer
 import io.kotest.assertions.withClue
 import io.kotest.core.spec.style.FreeSpec
 import io.kotest.inspectors.forAll
-import io.kotest.matchers.ints.shouldBeGreaterThanOrEqual
+import io.kotest.matchers.collections.shouldContainAll
+import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
@@ -72,11 +73,40 @@ class TransferDoorRepositoryTest : FreeSpec({
             .map { it to repository.findByLine(it) }
             .filter { (_, transfers) -> transfers.stations.isNotEmpty() }
 
-        // then - 다섯 노선 모두 환승 데이터가 있어야 한다.
-        withData.size shouldBeGreaterThanOrEqual 5
+        // then - 지금은 모든 뷰에 환승역이 있다.
+        withData.size shouldBe TestLines.catalog.all().size
         withData.forAll { (line, transfers) ->
             withClue("${line.slug} 에 출처가 없다") { transfers.source.shouldNotBeNull() }
         }
+    }
+
+    "지선 뷰는 환승 파일 하나를 나눠 쓰되 자기 목록에 있는 역만 가져간다" {
+        // given - 1호선은 구로에서 갈려 뷰가 둘이지만 옮겨 온 문서는 하나다.
+        val gyeongin = repository.findByLine(TestLines.bySlug("line1-gyeongin"))
+        val gyeongbu = repository.findByLine(TestLines.bySlug("line1-gyeongbu"))
+
+        // when
+        val onGyeongin = gyeongin.stations.map { it.station }
+        val onGyeongbu = gyeongbu.stations.map { it.station }
+
+        // then - 구로까지는 같고 그 뒤로 갈린다. 출처는 한 문서다.
+        onGyeongin.shouldContainAll("신도림", "부평")
+        onGyeongin shouldNotContain "수원"
+        onGyeongbu.shouldContainAll("신도림", "수원")
+        onGyeongbu shouldNotContain "부평"
+        gyeongin.source shouldBe gyeongbu.source
+    }
+
+    "모든 문과 이어진 문 범위를 가린다" {
+        // given - 4호선 금정은 1호선과 승강장을 나눠 쓰고, 한대앞은 수인분당선과 승강장 일부를 나눠 쓴다.
+        val line4 = repository.findByLine(TestLines.bySlug("line4")).stations
+        val geumjeong = line4.single { it.station == "금정" }.doors
+            .single { it.trainDirection == "불암산" && it.targetDirection == "청량리/광운대" }
+        val handaeap = line4.single { it.station == "한대앞" }.doors.single { it.trainDirection == "불암산" }
+
+        // when & then
+        listOf(geumjeong.car, geumjeong.door, geumjeong.toCar, geumjeong.toDoor).forAll { it.shouldBeNull() }
+        listOf(handaeap.car, handaeap.door, handaeap.toCar, handaeap.toDoor) shouldBe listOf(1, 1, 6, 4)
     }
 
     "비고가 있는 역과 없는 역을 가른다" {

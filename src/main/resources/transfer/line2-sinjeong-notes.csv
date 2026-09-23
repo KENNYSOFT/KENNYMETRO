@@ -1,0 +1,13 @@
+# 환승역별 주의사항
+#
+# 출처와 라이선스. 파서가 이 키들을 읽어 화면에 그대로 띄운다. CC BY 조건이라 뺄 수 없다.
+# source-document: 수도권 전철 환승 정보/서울 지하철 2호선
+# source-revision: r96
+# source-url: https://namu.wiki/w/수도권 전철 환승 정보/서울 지하철 2호선
+# license: CC BY-NC-SA 2.0 KR
+# license-url: https://creativecommons.org/licenses/by-nc-sa/2.0/kr/
+#
+# 컬럼: 역,비고
+# 파서가 첫 쉼표 하나로만 가르므로 비고 안에는 쉼표를 써도 된다.
+역,비고
+까치산,5호선 환승 통로가 1-1 쪽 개찰구 옆에 있다.

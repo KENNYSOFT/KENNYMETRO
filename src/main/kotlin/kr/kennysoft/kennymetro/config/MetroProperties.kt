@@ -30,6 +30,11 @@ data class MetroProperties(
      * 괄호 부기와 2호선 꼬리말은 여기 적지 않아도 떼어진다(`StationNames`).
      */
     val stationAliases: Map<String, String> = emptyMap(),
+    /**
+     * 노선마다 이름이 다른 환승역. 4호선은 총신대입구, 7호선은 이수라고 부른다. 환승 문을
+     * 대조할 때 같은 역으로 본다.
+     */
+    val transferNames: Map<String, String> = emptyMap(),
 )
 
 data class LineConfig(
@@ -57,6 +62,11 @@ data class LineConfig(
      * 병점에서 갈라진다. 형제 뷰에 있는 종착역은 적지 않아도 저절로 계산된다.
      */
     val beyond: Map<String, String> = emptyMap(),
+    /**
+     * 환승 문 파일 이름(`transfer/<이름>-doors.csv`). 적지 않으면 slug 다. 지선마다 뷰를 둔
+     * 노선은 원본 문서가 하나라 파일도 하나를 나눠 쓴다.
+     */
+    val transferFile: String? = null,
 )
 
 data class FleetConfig(

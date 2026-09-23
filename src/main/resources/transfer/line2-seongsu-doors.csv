@@ -1,9 +1,9 @@
-# 용인경전철 환승 문 위치
+# 2호선 성수지선 환승 문 위치
 #
 # 출처와 라이선스. 파서가 이 키들을 읽어 화면에 그대로 띄운다. CC BY 조건이라 뺄 수 없다.
-# source-document: 수도권 전철 환승 정보
-# source-revision: r697
-# source-url: https://namu.wiki/w/수도권 전철 환승 정보
+# source-document: 수도권 전철 환승 정보/서울 지하철 2호선
+# source-revision: r96
+# source-url: https://namu.wiki/w/수도권 전철 환승 정보/서울 지하철 2호선
 # license: CC BY-NC-SA 2.0 KR
 # license-url: https://creativecommons.org/licenses/by-nc-sa/2.0/kr/
 #
@@ -23,4 +23,6 @@
 #
 # 역은 노선 순서대로 적는다. 그 순서가 그대로 화면 순서가 되고, 어긋나면 기동이 실패한다.
 역,열차방면,환승노선,환승노선방면,칸,문
-기흥,,수인분당선,,1,1
+성수,,2호선,내선,4,4
+성수,,2호선,외선,*,*
+신설동,,1호선/우이신설선,,1,1

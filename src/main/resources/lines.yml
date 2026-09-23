@@ -18,6 +18,9 @@
 # 브라우저에 남는다.
 #
 # up / down 은 역 목록의 앞쪽과 뒤쪽이다. 화면에서 up 이 왼쪽이다.
+#
+# transfer-file 은 환승 문 파일(transfer/<이름>-doors.csv)의 이름이고 적지 않으면 slug 다.
+# 지선마다 뷰를 둔 노선은 옮겨 온 문서가 하나라 파일 하나를 나눠 쓰고, 뷰마다 자기 역만 가져간다.
 
 metro:
   # 처음 방문한 브라우저에 보여줄 노선과 그 순서. 고르고 나면 그 브라우저에 남으므로
@@ -52,6 +55,8 @@ metro:
     "[신림선]": "#6789ca"
     "[우이신설선]": "#b0ce18"
     "[인천1호선]": "#7ca8d5"
+    "[인천2호선]": "#ed8b00"
+    "[의정부경전철]": "#fda600"
     "[GTX-A]": "#9a6292"
     "[용인경전철]": "#56ab2e"
 
@@ -65,6 +70,12 @@ metro:
     # 6호선 서쪽으로 가는 열차의 종착. 응암에서 역촌, 구산을 돌아 나오는 순환 구간으로 든다.
     "[응암순환]": 응암
 
+  # 노선마다 이름이 다른 환승역. 환승 문을 대조할 때 같은 역으로 본다. 대괄호는 위와 같은
+  # 이유로 필수다.
+  transfer-names:
+    # 4호선은 총신대입구, 7호선은 이수라고 부른다.
+    "[총신대입구]": 이수
+
   lines:
     # 1호선은 구로에서 인천 방면과 신창 방면으로 갈려 역을 한 줄로 세울 수 없다.
     # 계통마다 뷰를 따로 두되 api-name 이 같아 실시간 위치는 한 번만 받는다.
@@ -74,6 +85,7 @@ metro:
       api-name: 1호선
       color: "#0052a4"
       source: seoul
+      transfer-file: line1
       up-label: 연천
       down-label: 인천
       termini: [연천, 소요산, 동두천, 양주, 광운대, 용산, 인천, 동인천]
@@ -88,6 +100,7 @@ metro:
       api-name: 1호선
       color: "#0052a4"
       source: seoul
+      transfer-file: line1
       up-label: 연천
       down-label: 신창
       termini: [연천, 소요산, 동두천, 양주, 광운대, 병점, 천안, 신창]
@@ -173,6 +186,7 @@ metro:
       api-name: 5호선
       color: "#996cac"
       source: seoul
+      transfer-file: line5
       up-label: 방화
       down-label: 하남검단산
       stations: [방화, 개화산, 김포공항, 송정, 마곡, 발산, 우장산, 화곡, 까치산, 신정, 목동, 오목교,
@@ -186,6 +200,7 @@ metro:
       api-name: 5호선
       color: "#996cac"
       source: seoul
+      transfer-file: line5
       up-label: 방화
       down-label: 마천
       stations: [방화, 개화산, 김포공항, 송정, 마곡, 발산, 우장산, 화곡, 까치산, 신정, 목동, 오목교,
@@ -253,6 +268,7 @@ metro:
       name: 경의중앙선
       color: "#77c4a3"
       source: seoul
+      transfer-file: gyeongui
       up-label: 문산
       down-label: 지평
       termini: [문산, 용문]
@@ -267,6 +283,7 @@ metro:
       api-name: 경의중앙선
       color: "#77c4a3"
       source: seoul
+      transfer-file: gyeongui
       up-label: 문산
       down-label: 서울역
       stations: [문산, 파주, 월롱, 금촌, 금릉, 운정, 야당, 탄현, 일산, 풍산, 백마, 곡산, 대곡, 능곡,
@@ -400,6 +417,7 @@ metro:
       api-name: GTX-A
       color: "#9a6292"
       source: seoul
+      transfer-file: gtx-a
       up-label: 운정중앙
       down-label: 서울역
       stations: [운정중앙, 킨텍스, 대곡, 연신내, 서울역]
@@ -409,6 +427,7 @@ metro:
       api-name: GTX-A
       color: "#9a6292"
       source: seoul
+      transfer-file: gtx-a
       up-label: 수서
       down-label: 동탄
       stations: [수서, 성남, 구성, 동탄]

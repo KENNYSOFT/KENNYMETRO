@@ -19,10 +19,10 @@ class LineCatalog(properties: MetroProperties) {
 
     private val lines: List<Line> = withSiblingAnchors(properties.lines.map { it.toLine() })
     private val bySlug: Map<String, Line> = lines.associateBy { it.slug }
-    private val byName: Map<String, Line> = lines.associateBy { it.name }
     private val colors: Map<String, String> = properties.transferColors
     private val preset: List<String> = properties.preset
     private val aliases: Map<String, String> = properties.stationAliases
+    private val transferNames: Map<String, String> = properties.transferNames
 
     /** API 역명을 우리 목록의 표기로 옮긴다. */
     val stationNames: StationNames = StationNames(aliases)
@@ -44,6 +44,10 @@ class LineCatalog(properties: MetroProperties) {
             require(from !in everyStation) { "station-aliases 가 실제 역 $from 을 다른 이름으로 바꾼다" }
             require(to in everyStation) { "station-aliases 가 어느 노선에도 없는 역을 가리킨다: $from -> $to" }
         }
+        transferNames.forEach { (one, other) ->
+            require(one.isNotBlank()) { "transfer-names 의 키가 비었다. 키를 대괄호로 감쌌는지 볼 것: $transferNames" }
+            require(one in everyStation && other in everyStation) { "transfer-names 가 어느 노선에도 없는 역을 가리킨다: $one -> $other" }
+        }
     }
 
     fun all(): List<Line> = lines
@@ -59,8 +63,25 @@ class LineCatalog(properties: MetroProperties) {
     /** 그 API 노선의 열차가 가리킬 수 있는 역명 전부. 여기 없는 이름이 오면 열차가 버려진다. */
     fun knownNames(cacheKey: String): Set<String> = known[cacheKey].orEmpty()
 
-    /** 이름으로 찾는다. 환승 대상이 우리가 담은 노선인지 가릴 때 쓴다. */
-    fun byName(name: String): Line? = byName[name]
+    /**
+     * 환승 대상 이름이 가리키는 우리 뷰. 우리가 담지 않은 노선이면 비어 있다.
+     *
+     * <p>
+     * 뷰 이름과 API 노선명 양쪽으로 찾는다. 지선마다 뷰를 둔 노선은 뷰 이름이 "1호선 (경인)"
+     * 이라 환승 대상의 "1호선" 과 맞지 않으므로 API 노선명으로 두 뷰를 함께 가리킨다. 지선은
+     * 괄호 없이 적혀 오므로("2호선 신정지선") 괄호와 공백을 빼고 견주고, 방면이나 운행 종류를
+     * 괄호로 덧붙인 이름("5호선 (방화 방면)")은 괄호 앞 이름으로 찾는다.
+     */
+    fun viewsNamed(name: String): List<Line> {
+        val base = name.substringBefore(" (").trim()
+        return lines.filter { compact(it.name) == compact(name) || it.apiName == base }
+    }
+
+    private fun compact(name: String) = name.filterNot { it == '(' || it == ')' || it.isWhitespace() }
+
+    /** 그 역과, 다른 노선에서 그 역을 부르는 이름. 환승 문을 대조할 때 쓴다. */
+    fun sameStations(station: String): Set<String> =
+        setOf(station) + transferNames.filter { (one, other) -> station == one || station == other }.flatMap { listOf(it.key, it.value) }
 
     fun bySlug(slug: String): Line? = bySlug[slug]
 
@@ -110,6 +131,7 @@ class LineCatalog(properties: MetroProperties) {
             fleet = fleet?.toFleet(slug),
             termini = ends.toSet(),
             anchors = anchors,
+            transferFile = transferFile ?: slug,
         )
     }
 

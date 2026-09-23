@@ -22,6 +22,11 @@ import org.springframework.stereotype.Component
  * 데이터와 같은 파일에 있어야 한쪽만 고쳐지는 일이 없다. CC BY 조건이라 화면에서 뺄 수 없다.
  *
  * <p>
+ * 지선마다 뷰를 둔 노선(1호선, 5호선, 경의중앙선, GTX-A)은 원본 문서가 하나라 파일도 하나를
+ * 나눠 쓴다. 각 뷰는 자기 목록에 있는 역만 가져가고, 나눠 쓰는 뷰 어디에도 없는 역은 오타로
+ * 보고 기동을 실패시킨다.
+ *
+ * <p>
  * 리소스는 native image 에 자동으로 실리지 않는다. `TransferDataRuntimeHints` 가 등록하고
  * `scripts/smoke-test.sh` 가 실제 바이너리로 왕복해 확인한다.
  */
@@ -34,26 +39,28 @@ class TransferDoorRepository(private val catalog: LineCatalog) {
     fun findByLine(line: Line): LineTransfers = byLine[line.slug] ?: LineTransfers(null, emptyList())
 
     private fun load(line: Line): LineTransfers {
-        val doorFile = readFile("transfer/${line.slug}-doors.csv", DOOR_COLUMNS)
+        val doorFile = readFile("transfer/${line.transferFile}-doors.csv", DOOR_COLUMNS)
         if (doorFile == null) return LineTransfers(null, emptyList())
+        val sharers = catalog.all().filter { it.transferFile == line.transferFile }
 
-        val notes = readFile("transfer/${line.slug}-notes.csv", NOTE_COLUMNS)
+        val notes = readFile("transfer/${line.transferFile}-notes.csv", NOTE_COLUMNS)
             ?.rows.orEmpty()
             .associate { (lineNo, columns) ->
                 require(columns.size == NOTE_COLUMNS) { "비고 ${lineNo}번 줄의 컬럼이 ${NOTE_COLUMNS}개가 아니다: $columns" }
+                requireKnown(columns[0], sharers, "transfer/${line.transferFile}-notes.csv:$lineNo")
                 columns[0] to columns[1]
             }
 
-        val doors = parseDoors(doorFile, line)
+        val doors = parseDoors(doorFile, line, sharers)
 
         // 여기서 정렬해 버리면 파일이 흐트러져도 조용히 바로잡혀 사람이 모른다. 순서가 곧
         // 화면 순서이므로 어긋난 것을 알려주는 편이 낫다.
         val indexes = doors.keys.map { line.indexOf(it)!! }
         require(indexes == indexes.sorted()) {
-            "transfer/${line.slug}-doors.csv 의 역을 ${line.name} 순서대로 적어야 한다: ${doors.keys}"
+            "${doorFile.path} 의 역을 ${line.name} 순서대로 적어야 한다: ${doors.keys}"
         }
 
-        verifyTargets(line, doors)
+        verifyTargets(line, doors, doorFile.path)
 
         return LineTransfers(
             source = doorFile.source(line.slug),
@@ -70,38 +77,79 @@ class TransferDoorRepository(private val catalog: LineCatalog) {
      * 원본 문서에서 표를 옮길 때 역 제목을 놓치면 그 표가 앞 역에 붙는다. 그렇게 생긴
      * 행은 역명도 노선도 각각은 멀쩡해 다른 검사에 걸리지 않으므로, 두 노선이 실제로
      * 그 역에서 만나는지를 따로 본다. 우리가 담지 않은 노선은 대조할 것이 없어 넘어간다.
+     * 목록 밖이어도 그 노선 열차가 닿는 역(beyond)이면 갈아탈 수 있다 - 1호선 광운대에서
+     * 경춘선으로 갈아타는 것이 그렇다. 노선마다 이름이 다른 역(총신대입구와 이수)은 lines.yml 의
+     * transfer-names 로 같은 역임을 안다.
      */
-    private fun verifyTargets(line: Line, doors: Map<String, List<TransferDoor>>) {
+    private fun verifyTargets(line: Line, doors: Map<String, List<TransferDoor>>, path: String) {
         doors.forEach { (station, stationDoors) ->
+            val names = catalog.sameStations(station)
             stationDoors.forEach { door ->
                 door.targetLine.split("/").forEach { name ->
-                    val other = catalog.byName(name.trim()) ?: return@forEach
-                    require(other.indexOf(station) != null) {
-                        "transfer/${line.slug}-doors.csv: ${line.name} $station 역은 ${other.name} 에 없어 환승할 수 없다"
+                    val others = catalog.viewsNamed(name.trim())
+                    if (others.isEmpty()) return@forEach
+                    require(others.any { other -> names.any { other.indexOf(it) != null || it in other.anchors } }) {
+                        "$path: ${line.name} $station 역은 ${others.joinToString("/") { it.name }} 에 없어 환승할 수 없다"
                     }
                 }
             }
         }
     }
 
-    private fun parseDoors(file: ParsedFile, line: Line): Map<String, List<TransferDoor>> {
+    private fun parseDoors(file: ParsedFile, line: Line, sharers: List<Line>): Map<String, List<TransferDoor>> {
         // 파싱 순서가 곧 화면 표시 순서라 LinkedHashMap 으로 원본 줄 순서를 지킨다.
         val result = LinkedHashMap<String, MutableList<TransferDoor>>()
         file.rows.forEach { (lineNo, columns) ->
             val where = "${file.path}:$lineNo"
             require(columns.size == DOOR_COLUMNS) { "$where 컬럼이 ${DOOR_COLUMNS}개여야 한다: $columns" }
             val station = columns[0]
-            require(line.indexOf(station) != null) { "$where ${line.name}에 없는 역이다: $station" }
+            requireKnown(station, sharers, where)
+            val spot = spot(columns[4], columns[5], where)
+            if (line.indexOf(station) == null) return@forEach
             result.getOrPut(station) { mutableListOf() } += TransferDoor(
                 trainDirection = columns[1].ifBlank { null },
                 targetLine = columns[2],
                 targetDirection = columns[3].ifBlank { null },
-                car = columns[4].toIntOrNull() ?: error("$where 칸이 숫자가 아니다: ${columns[4]}"),
-                door = columns[5].toIntOrNull() ?: error("$where 문이 숫자가 아니다: ${columns[5]}"),
+                car = spot.car,
+                door = spot.door,
+                toCar = spot.toCar,
+                toDoor = spot.toDoor,
             )
         }
         return result
     }
+
+    /** 파일을 나눠 쓰는 뷰 어디에도 없는 역은 오타다. 한 뷰만 쓰는 파일이면 그 뷰에 없는 역이다. */
+    private fun requireKnown(station: String, sharers: List<Line>, where: String) {
+        require(sharers.any { it.indexOf(station) != null }) {
+            "$where ${sharers.joinToString("/") { it.name }}에 없는 역이다: $station"
+        }
+    }
+
+    /**
+     * 칸과 문 칸을 읽는다. 둘 다 `*` 이면 어느 문에서 내려도 되고, `4~7` 과 `1~4` 처럼 물결로
+     * 이으면 4-1 부터 7-4 까지 이어진 문이다. 한쪽만 그렇게 적은 줄은 틀린 것이다.
+     */
+    private fun spot(car: String, door: String, where: String): Spot {
+        require((car == "*") == (door == "*")) { "$where 칸과 문은 둘 다 * 여야 모든 문이다: $car, $door" }
+        if (car == "*") return Spot(null, null, null, null)
+        val cars = numbers(car, "칸", where)
+        val doors = numbers(door, "문", where)
+        require(cars.size == doors.size) { "$where 칸과 문은 둘 다 범위이거나 둘 다 한 자리여야 한다: $car, $door" }
+        if (cars.size == 1) return Spot(cars[0], doors[0], null, null)
+        require(cars[0] < cars[1] || (cars[0] == cars[1] && doors[0] < doors[1])) {
+            "$where 범위의 앞 자리가 뒤 자리보다 뒤에 있다: $car, $door"
+        }
+        return Spot(cars[0], doors[0], cars[1], doors[1])
+    }
+
+    private fun numbers(text: String, what: String, where: String): List<Int> {
+        val parts = text.split("~")
+        require(parts.size <= 2) { "$where ${what}은 한 자리나 범위여야 한다: $text" }
+        return parts.map { it.trim().toIntOrNull() ?: error("$where ${what}이 숫자가 아니다: $text") }
+    }
+
+    private data class Spot(val car: Int?, val door: Int?, val toCar: Int?, val toDoor: Int?)
 
     /**
      * 주석에서 읽은 출처. 하나라도 빠지면 기동을 실패시킨다 - 표기 없이 데이터만 나가는 것이

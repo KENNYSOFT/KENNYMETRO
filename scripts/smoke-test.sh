@@ -103,6 +103,12 @@ echo "$TRANSFERS" | grep -q '"car":6,"door":4' || fail "환승 문 위치가 응
 echo "$TRANSFERS" | grep -q '"license":"CC BY-NC-SA 2.0 KR"' || fail "라이선스 표기가 빠졌다: $TRANSFERS"
 echo "$TRANSFERS" | grep -q '"revision":"r' || fail "출처 판이 빠졌다: $TRANSFERS"
 echo "$TRANSFERS" | grep -q '"document":"수도권' || fail "출처 문서명이 빠졌다: $TRANSFERS"
+# 지선 뷰가 나눠 쓰는 파일과, 문 하나가 아닌 자리(이어진 범위, 모든 문)도 바이너리에서 읽혀야 한다.
+LINE4=$(curl -sf "$BASE/api/lines/line4/transfers") || fail "4호선 환승 정보를 받지 못했다"
+echo "$LINE4" | grep -q '"car":1,"door":1,"toCar":6,"toDoor":4' || fail "이어진 문 범위가 응답에 없다: $LINE4"
+echo "$LINE4" | grep -q '"car":null,"door":null' || fail "모든 문 자리가 응답에 없다: $LINE4"
+GYEONGBU=$(curl -sf "$BASE/api/lines/line1-gyeongbu/transfers") || fail "1호선 경부 환승 정보를 받지 못했다"
+echo "$GYEONGBU" | grep -q '"station":"수원"' || fail "나눠 쓰는 환승 파일이 경부 뷰에 실리지 않았다: $GYEONGBU"
 
 # 노선 목록. lines.yml 이 native image 에 실리지 않으면 여기가 빈다.
 LINES=$(curl -sf "$BASE/api/lines") || fail "노선 목록을 받지 못했다"

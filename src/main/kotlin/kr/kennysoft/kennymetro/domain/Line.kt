@@ -57,6 +57,8 @@ data class Line(
      * 종착역(서동탄, 광명)은 lines.yml 의 beyond 로 적는다.
      */
     val anchors: Map<String, Destination>,
+    /** 환승 문 파일 이름(`transfer/<이름>-doors.csv`). 지선마다 뷰를 둔 노선은 한 파일을 나눠 쓴다. */
+    val transferFile: String,
 ) {
 
     /** 실시간 위치를 공유하는 단위. 이 값이 같으면 호출도 캐시도 한 벌이다. */

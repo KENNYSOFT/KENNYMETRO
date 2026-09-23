@@ -2,6 +2,7 @@ package kr.kennysoft.kennymetro.domain
 
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.FreeSpec
+import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContainAll
 import io.kotest.matchers.ints.shouldBeGreaterThanOrEqual
 import io.kotest.matchers.nulls.shouldBeNull
@@ -94,6 +95,33 @@ class LineCatalogTest : FreeSpec({
         colors["1호선"] shouldNotBe colors["인천1호선"]
         // 뭉개진 키끼리는 나중에 적은 색이 앞의 것을 덮어 수가 준다.
         colors.size shouldBeGreaterThanOrEqual 20
+    }
+
+    "환승 대상 이름으로 우리 뷰를 찾는다" {
+        // given - 환승 표는 지선 뷰를 모르고 노선 이름으로 적는다. 지선은 괄호 없이 적고, 방면을 괄호로 덧붙이기도 한다.
+        val catalog = TestLines.catalog
+
+        // when & then
+        catalog.viewsNamed("1호선").map { it.slug } shouldBe listOf("line1-gyeongin", "line1-gyeongbu")
+        catalog.viewsNamed("2호선 신정지선").map { it.slug } shouldBe listOf("line2-sinjeong")
+        catalog.viewsNamed("5호선 (방화 방면)").map { it.slug } shouldBe listOf("line5-hanam", "line5-macheon")
+        catalog.viewsNamed("인천1호선").shouldBeEmpty()
+    }
+
+    "노선마다 이름이 다른 환승역을 같은 역으로 본다" {
+        // given - 4호선의 총신대입구와 7호선의 이수는 한 역이다. 모르면 두 노선 사이의 환승 문이 대조에 걸린다.
+        val catalog = TestLines.catalog
+
+        // when & then
+        catalog.sameStations("이수") shouldBe setOf("이수", "총신대입구")
+        catalog.sameStations("총신대입구") shouldBe setOf("총신대입구", "이수")
+        catalog.sameStations("강남") shouldBe setOf("강남")
+    }
+
+    "환승 파일 이름을 적지 않으면 slug 를 쓴다" {
+        // given & when & then - 지선 뷰만 원본 문서를 따라 파일을 나눠 쓴다.
+        TestLines.bySlug("line1-gyeongbu").transferFile shouldBe "line1"
+        TestLines.line2.transferFile shouldBe "line2"
     }
 
     "노선에 없는 역을 주요 역으로 가리키면 기동이 실패한다" {
