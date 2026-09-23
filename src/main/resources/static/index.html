@@ -87,7 +87,9 @@
     width: 2px; margin-left: -1px; background: var(--rail);
   }
   /* 방향. 왼쪽 칸의 열차는 목록 위쪽으로, 오른쪽 칸은 아래쪽으로 간다. 칸 뒤에 옅은 화살표를 깐다.
-     열차 칩이 불투명해 칩이 없는 자리에서만 보인다. */
+     열차 칩이 불투명해 칩이 없는 자리에서만 보인다. 화살표는 구간마다 깔아, 열차가 한쪽으로만
+     다니는 구간(6호선 순환 구간)은 다니지 않는 쪽을 비운다. */
+  .segment { position: relative; }
   .dir {
     position: absolute; top: 0; bottom: 0; pointer-events: none;
     background-repeat: repeat-y; background-position: center 12px; background-size: 22px 57px;
@@ -383,10 +385,17 @@ function buildRail(line) {
   const transfers = transfersByLine[line.slug];
   const keys = keysOf(line);
   rail.style.setProperty('--name-w', nameWidth(line.stations.slice(range.from, range.to + 1)));
-  rail.appendChild(el('div', 'dir up'));
-  rail.appendChild(el('div', 'dir down'));
+  let segment = null;
+  let lanes = null;
   for (let i = range.from; i <= range.to; i++) {
     const name = line.stations[i];
+    // 열차가 다니는 쪽이 바뀌는 자리에서 구간을 새로 연다. 화살표는 구간마다 깐다.
+    const here = lanesAt(line, name);
+    if (here !== lanes) {
+      segment = buildSegment(here);
+      rail.appendChild(segment);
+      lanes = here;
+    }
     const stop = el('div', 'stop');
     stop.dataset.index = String(i);
     stop.appendChild(el('div', 'lane up', ''));
@@ -400,10 +409,26 @@ function buildRail(line) {
     stop.appendChild(label);
 
     stop.appendChild(el('div', 'lane down', ''));
-    rail.appendChild(stop);
-    if (info) rail.appendChild(buildTransferPanel(panelId, info, line));
+    segment.appendChild(stop);
+    if (info) segment.appendChild(buildTransferPanel(panelId, info, line));
   }
   return rail;
+}
+
+/** 그 역에서 열차가 다니는 쪽. 6호선 순환 구간은 오른쪽으로만 다닌다. */
+function lanesAt(line, name) {
+  return line.downOnly.includes(name) ? 'down' : 'both';
+}
+
+/**
+ * 화살표를 깔 구간. 화살표는 구간 전체에 이어 깔리므로, 열차가 한쪽으로만 다니는 자리는 구간을
+ * 따로 열어 다니지 않는 쪽의 화살표를 뺀다.
+ */
+function buildSegment(lanes) {
+  const segment = el('div', 'segment');
+  if (lanes === 'both') segment.appendChild(el('div', 'dir up'));
+  segment.appendChild(el('div', 'dir down'));
+  return segment;
 }
 
 function placeTrains(section, line, trains) {

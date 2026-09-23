@@ -47,6 +47,7 @@ class LineController(
         // 용인경전철은 다른 엔드포인트라 하루 1,000회 예산에 들지 않는다.
         budgeted = source == LineSource.SEOUL,
         extraDestinations = ArrayList(anchors.keys),
+        downOnly = ArrayList(downOnly),
     )
 }
 
@@ -81,4 +82,6 @@ data class LineView(
      * 열차의 종착이다. `scripts/probe-coverage.sh` 가 역명을 대조할 때 오탐을 막는 데 쓴다.
      */
     val extraDestinations: List<String>,
+    /** 열차가 down 쪽으로만 지나는 역. 화면은 그 역의 왼쪽 화살표를 그리지 않는다. */
+    val downOnly: List<String>,
 )

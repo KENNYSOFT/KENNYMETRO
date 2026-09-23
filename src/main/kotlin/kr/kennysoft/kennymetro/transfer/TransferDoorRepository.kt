@@ -141,9 +141,10 @@ class TransferDoorRepository(private val catalog: LineCatalog) {
         if (trainDirection == null) {
             return when {
                 line.circular -> null
+                // 6호선 역촌은 목록의 첫 역이지만 순환 구간이라 열차가 오른쪽으로만 지난다.
+                station in line.downOnly -> Direction.DOWN
                 station == line.stations.first() -> Direction.UP
                 station == line.stations.last() -> Direction.DOWN
-                station in line.downOnly -> Direction.DOWN
                 else -> null
             }
         }

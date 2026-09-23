@@ -41,6 +41,17 @@ class TrainTest : FreeSpec({
         train?.direction shouldBe Direction.UP
     }
 
+    "6호선 순환 구간을 도는 열차는 응암으로 나오는 쪽으로 그린다" {
+        // given - 순환 구간은 역촌에서 구산을 지나 응암으로 나와 새절로 간다. 새절에서 응암으로 드는 열차는 반대쪽이다.
+        val line6 = TestLines.bySlug("line6")
+        val inLoop = position(current = "불광", terminal = "응암", updnLine = "0")
+        val entering = position(current = "새절", terminal = "응암", updnLine = "0")
+
+        // when & then - 순환 구간 열차가 종착을 응암으로 달고 와도 오른쪽으로 가야 한다.
+        inLoop.toTrain(line6)?.direction shouldBe Direction.DOWN
+        entering.toTrain(line6)?.direction shouldBe Direction.UP
+    }
+
     "노선 끝까지 가지 않는 열차를 가려낸다" {
         // given
         val shortTurn = position(current = "강남", terminal = "정자", updnLine = "1")
