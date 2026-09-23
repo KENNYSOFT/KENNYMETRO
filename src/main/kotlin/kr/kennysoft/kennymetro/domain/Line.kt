@@ -57,6 +57,15 @@ data class Line(
      * 종착역(서동탄, 광명)은 lines.yml 의 beyond 로 적는다.
      */
     val anchors: Map<String, Destination>,
+    /**
+     * 열차가 down 쪽으로만 지나는 역.
+     *
+     * <p>
+     * 6호선 응암 순환 구간(역촌에서 구산까지)은 한 방향으로만 돌고, 이 목록 순서로 세우면 그
+     * 방향이 down 이다. 원문이 방면 없이 적은 환승 문(불광, 연신내)을 이 역들에서는 화면의 오른쪽
+     * 칸에만 둔다. 방면 없는 줄은 보통 양쪽에 두지만 이 역에는 왼쪽으로 가는 열차가 들어오지 않는다.
+     */
+    val downOnly: Set<String>,
     /** 환승 문 파일 이름(`transfer/<이름>-doors.csv`). 지선마다 뷰를 둔 노선은 한 파일을 나눠 쓴다. */
     val transferFile: String,
 ) {

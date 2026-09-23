@@ -1,5 +1,6 @@
 package kr.kennysoft.kennymetro.transfer
 
+import kr.kennysoft.kennymetro.domain.Direction
 import kr.kennysoft.kennymetro.domain.Line
 import kr.kennysoft.kennymetro.domain.LineCatalog
 import kr.kennysoft.kennymetro.domain.LineTransfers
@@ -106,8 +107,10 @@ class TransferDoorRepository(private val catalog: LineCatalog) {
             requireKnown(station, sharers, where)
             val spot = spot(columns[4], columns[5], where)
             if (line.indexOf(station) == null) return@forEach
+            val trainDirection = columns[1].ifBlank { null }
             result.getOrPut(station) { mutableListOf() } += TransferDoor(
-                trainDirection = columns[1].ifBlank { null },
+                trainDirection = trainDirection,
+                side = sideOf(trainDirection, station, line, where),
                 targetLine = columns[2],
                 targetDirection = columns[3].ifBlank { null },
                 car = spot.car,
@@ -117,6 +120,71 @@ class TransferDoorRepository(private val catalog: LineCatalog) {
             )
         }
         return result
+    }
+
+    /**
+     * 그 줄을 화면의 어느 칸에 둘지. null 이면 양쪽이다.
+     *
+     * <p>
+     * 열차 방면은 원문의 열 제목이라 화면의 좌우 이름과 글자가 다르다("연천/광운대", "용산 급행",
+     * "광명셔틀 광명"). 그래서 이름이 아니라 자리로 가린다. 방면에 적힌 역이 역 목록에서 지금
+     * 역보다 앞이면 열차가 앞쪽으로 가는 것이라 왼쪽 칸이고, 뒤면 오른쪽 칸이다. 급행이나 순환처럼
+     * 역이 아닌 낱말은 건너뛴다. 가릴 역이 하나도 없거나 낱말끼리 쪽이 어긋나면 기동을 실패시킨다.
+     *
+     * <p>
+     * 방면이 비어 있으면 어느 쪽으로 가든 같은 문이라 양쪽에 둔다. 다만 열차가 한쪽으로만 들어오는
+     * 역은 그쪽에만 둔다. 목록의 첫 역에는 앞쪽으로 가는 열차만, 끝 역에는 뒤쪽으로 가는 열차만
+     * 들어온다(수인분당선 청량리와 인천). 6호선 순환 구간은 lines.yml 의 down-only 로 안다.
+     * 순환선은 끝이 없고 방면을 외선과 내선으로 적으므로 좌우 이름과 그대로 견준다.
+     */
+    private fun sideOf(trainDirection: String?, station: String, line: Line, where: String): Direction? {
+        if (trainDirection == null) {
+            return when {
+                line.circular -> null
+                station == line.stations.first() -> Direction.UP
+                station == line.stations.last() -> Direction.DOWN
+                station in line.downOnly -> Direction.DOWN
+                else -> null
+            }
+        }
+        if (line.circular) {
+            return when (trainDirection) {
+                line.upLabel -> Direction.UP
+                line.downLabel -> Direction.DOWN
+                else -> error("$where 순환선의 열차 방면이 ${line.upLabel}, ${line.downLabel} 중 하나가 아니다: $trainDirection")
+            }
+        }
+        val sides = trainDirection.split('/', ' ').mapNotNull { towards(it, station, line) }.toSet()
+        require(sides.isNotEmpty()) { "$where 열차 방면에 ${line.name} 의 어느 쪽인지 가릴 역이 없다: $trainDirection" }
+        require(sides.size == 1) { "$where 열차 방면의 역들이 서로 다른 쪽을 가리킨다: $trainDirection" }
+        return sides.single()
+    }
+
+    /**
+     * 그 역으로 가는 열차가 지금 역에서 어느 쪽으로 가는지. 역이 아닌 낱말이거나 지금 역이면 null.
+     *
+     * <p>
+     * 이 뷰의 목록에 없는 역은 같은 API 노선의 다른 뷰에서 찾아, 두 역을 함께 담은 뷰에서 자리를
+     * 견준다. 그 뷰들은 앞쪽 끝을 같이 쓰므로(1호선은 연천, 5호선은 방화) 어느 뷰에서 견주든 쪽이
+     * 같다. 5호선 마천 뷰의 강동에서 하남검단산행이 그렇게 풀린다 - 이 뷰에서는 하남검단산이 바로
+     * 강동에서 갈라져 자리가 같다. 어느 뷰에도 없는 종착역(1호선 광명)은 갈라지는 역의 자리로 본다.
+     */
+    private fun towards(name: String, station: String, line: Line): Direction? {
+        val views = listOf(line) + catalog.all().filter { it !== line && it.cacheKey == line.cacheKey }
+        views.forEach { view ->
+            val to = view.indexOf(name)
+            val from = view.indexOf(station)
+            if (to != null && from != null) return directionBetween(from, to)
+        }
+        val anchor = line.anchors[name] ?: return null
+        return directionBetween(line.indexOf(station)!!, anchor.index)
+    }
+
+    /** 목록의 from 번째 역에서 to 번째 역으로 가는 쪽. 같은 역이면 null. */
+    private fun directionBetween(from: Int, to: Int): Direction? = when {
+        to < from -> Direction.UP
+        to > from -> Direction.DOWN
+        else -> null
     }
 
     /** 파일을 나눠 쓰는 뷰 어디에도 없는 역은 오타다. 한 뷰만 쓰는 파일이면 그 뷰에 없는 역이다. */

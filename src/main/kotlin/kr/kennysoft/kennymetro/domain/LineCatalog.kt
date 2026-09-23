@@ -99,6 +99,7 @@ class LineCatalog(properties: MetroProperties) {
                 ?: error("$slug: $where 가 노선에 없는 역을 가리킨다: $station")
 
         keyStations.forEach { indexOrFail(it, "key-stations") }
+        downOnly.forEach { indexOrFail(it, "down-only") }
         // 노선 순서와 반대로 적어도 되게 한다. 2호선 관심 구간이 강남에서 잠실인데
         // 역 순서로는 잠실이 앞이다.
         val bounds = focus.map { indexOrFail(it, "focus") }.sorted()
@@ -131,6 +132,7 @@ class LineCatalog(properties: MetroProperties) {
             fleet = fleet?.toFleet(slug),
             termini = ends.toSet(),
             anchors = anchors,
+            downOnly = downOnly.toSet(),
             transferFile = transferFile ?: slug,
         )
     }

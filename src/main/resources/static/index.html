@@ -179,25 +179,58 @@
   }
   .name button[aria-expanded="true"] { background: var(--card); }
 
-  /* 레일 세로선이 absolute 라 배경만으로는 안 가려진다.
-     폭을 풀어 두면 넓은 화면에서 문 번호가 노선명과 화면 양끝으로 갈라져 같은 줄로 안 읽힌다. */
+  /* 환승 문 위치는 역 이름 양옆 칸에 나눠 둔다. 칸이 곧 타고 온 열차의 방면이라 열차 칩이 서는
+     칸과 같은 격자를 쓴다. 가운데를 비워 레일 세로선이 이어져 보이게 한다. */
   .transfer {
-    position: relative; z-index: 1;
-    max-width: 520px; margin: 2px auto 10px;
-    background: var(--card); border-radius: 8px;
-    padding: 10px 12px; font-size: 12px;
+    display: grid; grid-template-columns: 1fr var(--name-w) 1fr;
+    align-items: start; row-gap: 6px;
+    margin: 2px 0 10px; font-size: 12px;
   }
-  /* 문 번호를 오른쪽 끝에 세워 세로로 훑을 수 있게 한다. */
-  .tr-row { display: flex; gap: 10px; align-items: baseline; padding: 2px 0; }
-  .tr-dir { min-width: 62px; color: var(--muted); }
-  .tr-line { flex: 1; }
+  /* display 를 정한 요소는 hidden 속성이 먹지 않는다. */
+  .transfer[hidden] { display: none; }
+  /* 칸 뒤의 방향 화살표가 absolute 라 쌓임 순서를 올려야 덮인다.
+     노선명과 문 번호를 두 열로 세워 줄이 여럿이어도 문 번호를 세로로 훑을 수 있게 한다. 문 번호 열은
+     문 번호 폭만큼만 두고 남는 폭은 노선명 열에 준다 - 좁은 화면에서는 노선명이 먼저 접히고, 긴 방면
+     이름이 칸을 넓혀도 문 번호가 한 열에 모인다. 노선명이 여러 줄로 접히면 문 번호는 마지막 줄에
+     선다. 첫 줄에 서면 그 줄의 노선에만 붙은 문처럼 읽힌다. */
+  .tr-side {
+    position: relative; z-index: 1;
+    display: grid; grid-template-columns: 1fr auto; column-gap: 8px; row-gap: 2px;
+    align-items: end; word-break: keep-all;
+    background: var(--card); border-radius: 8px; padding: 7px 10px;
+  }
+  .tr-side.up { grid-column: 1; justify-self: end; }
+  .tr-side.down { grid-column: 3; justify-self: start; }
+  /* 왼쪽 칸은 노선명을 레일 옆의 문 번호에 붙이고, 오른쪽 칸은 문 번호를 칸 끝에 맞춘다. */
+  .tr-side.up .tr-line, .tr-side.up .tr-train { text-align: right; }
+  .tr-side.down .tr-door { text-align: right; }
+  /* 한 칸에 방면이 둘 이상 섞일 때만 나오는 방면 이름. 노량진의 완행과 급행이 그렇다. */
+  .tr-train { grid-column: 1 / -1; color: var(--muted); font-size: 11px; }
+  .tr-train:not(:first-child) { margin-top: 4px; }
+  /* 동그라미와 노선명 사이에서 줄이 바뀌지 않게 한다. */
+  .tr-name { white-space: nowrap; }
   /* 갈아탈 노선의 색. 이름만으로는 어느 노선인지 한눈에 안 들어온다. */
   .line-dot {
     display: inline-block; width: 8px; height: 8px; border-radius: 50%;
     margin-right: 4px;
   }
   .tr-door { font-weight: 600; }
-  .tr-note { margin: 8px 0 0; color: var(--muted); line-height: 1.5; }
+  /* 자리 하나는 줄을 바꾸지 않는다. 브라우저가 2-4 를 붙임표 뒤에서 끊는다. 자리 사이에서는 바꿀 수 있다. */
+  .tr-spot { white-space: nowrap; }
+  /* 비고는 어느 칸의 것인지 가릴 수 없어 두 칸 아래에 걸쳐 두고 레일 세로선을 덮는다.
+     폭을 풀어 두면 넓은 화면에서 한 줄이 너무 길어진다. */
+  .tr-note {
+    grid-column: 1 / -1; justify-self: center; max-width: 520px;
+    position: relative; z-index: 1;
+    margin: 0; padding: 7px 10px; border-radius: 8px;
+    background: var(--card); color: var(--muted); line-height: 1.5;
+  }
+  /* 좁은 화면에서는 한 칸이 130px 남짓이라 노선명이 여러 줄로 접힌다. 글자와 여백을 줄여 덜 접히게 한다.
+     위의 기본 규칙보다 뒤에 있어야 덮어쓴다. */
+  @media (max-width: 480px) {
+    .transfer { font-size: 11px; }
+    .tr-side { padding: 5px 7px; column-gap: 6px; }
+  }
 
   footer { margin-top: 24px; padding-top: 12px; border-top: 1px solid var(--edge); font-size: 12px; color: var(--muted); }
   footer a { color: inherit; }
@@ -368,7 +401,7 @@ function buildRail(line) {
 
     stop.appendChild(el('div', 'lane down', ''));
     rail.appendChild(stop);
-    if (info) rail.appendChild(buildTransferPanel(panelId, info));
+    if (info) rail.appendChild(buildTransferPanel(panelId, info, line));
   }
   return rail;
 }
@@ -452,32 +485,87 @@ function transferToggle(name, panelId) {
   return btn;
 }
 
-function buildTransferPanel(id, info) {
+/**
+ * 환승 패널. 역 이름 양옆 칸에 나눠 둔다.
+ *
+ * 왼쪽 칸은 왼쪽 열차에서, 오른쪽 칸은 오른쪽 열차에서 내릴 때의 문이다. 칸이 곧 타고
+ * 온 열차의 방면이라 방면 이름은 적지 않는다. 어느 칸인지는 서버가 정해 보내고(side), 비어
+ * 있으면 어느 쪽으로 가든 같은 문이라 양쪽에 둔다. 종착역처럼 열차가 한쪽으로만 들어오는 역은
+ * 서버가 그쪽으로 정해 보내므로 한 칸만 선다.
+ */
+function buildTransferPanel(id, info, line) {
   const box = el('div', 'transfer');
   box.id = id;
   box.hidden = true;
-  for (const g of groupDoors(info.doors)) {
-    const row = el('div', 'tr-row');
-    // 시종착역은 열차 방면을 가릴 것이 없어 이 칸이 빈다. 자리는 남겨 세로줄을 맞춘다.
-    row.appendChild(el('span', 'tr-dir', g.trainDirection ? g.trainDirection + ' 방면' : ''));
-    row.appendChild(buildTargetCell(g));
-    row.appendChild(el('span', 'tr-door', g.spots.join(', ')));
-    box.appendChild(row);
-  }
+  const up = info.doors.filter(d => d.side !== 'DOWN');
+  const down = info.doors.filter(d => d.side !== 'UP');
+  if (up.length > 0) box.appendChild(buildTransferSide(line, up, 'up'));
+  if (down.length > 0) box.appendChild(buildTransferSide(line, down, 'down'));
   if (info.note) box.appendChild(el('p', 'tr-note', info.note));
   return box;
 }
 
-/** 갈아탈 노선. 여럿이면 슬래시로 이어져 있으므로 쪼개서 각각 색 동그라미를 붙인다. */
-function buildTargetCell(g) {
+/**
+ * 한 칸. 방면 이름은 그 칸에 방면이 둘 이상 섞일 때만 적는다 - 노량진의 완행과 용산 급행처럼
+ * 같은 쪽으로 가도 서는 자리가 다른 열차가 있다. 방면이 하나여도 그 칸의 평소 열차가 아니면
+ * 적는다(5호선 마천 뷰에서 강동의 하남검단산행).
+ */
+function buildTransferSide(line, doors, side) {
+  const cell = el('div', 'tr-side ' + side);
+  cell.setAttribute('role', 'group');
+  cell.setAttribute('aria-label', sideName(line, side) + ' 열차에서 내릴 때');
+  const directions = [...new Set(doors.map(d => d.trainDirection))];
+  const named = directions.length > 1 || (directions[0] != null && !isOwnDirection(line, directions[0]));
+  for (const direction of directions) {
+    if (named && direction) cell.appendChild(el('div', 'tr-train', direction + ' 방면'));
+    for (const g of mergeDoors(doors.filter(d => d.trainDirection === direction))) {
+      cell.appendChild(buildTargetCell(g.targets));
+      cell.appendChild(buildDoorCell(g.spots));
+    }
+  }
+  return cell;
+}
+
+/** 그 칸의 이름. 순환선은 방면 대신 외선과 내선이다. */
+function sideName(line, side) {
+  const label = side === 'up' ? line.upLabel : line.downLabel;
+  return line.circular ? label : label + ' 방면';
+}
+
+/**
+ * 그 칸의 평소 열차 방면인지. 방면에 이 뷰의 역이나 좌우 이름이 들어 있으면 평소 열차다.
+ * 없으면 이 뷰를 지나다 갈라져 나가는 열차의 방면이다.
+ */
+function isOwnDirection(line, direction) {
+  if (direction === line.upLabel || direction === line.downLabel) return true;
+  return direction.split(/[\/\s]/).some(word => line.stations.includes(word));
+}
+
+/** 갈아탈 노선들. 한 줄에 여럿이면 슬래시로 이어져 오므로 쪼개서 각각 색 동그라미를 붙인다. */
+function buildTargetCell(targets) {
   const cell = el('span', 'tr-line');
-  g.targetLine.split('/').forEach((name, i) => {
+  targets.forEach((target, i) => {
     if (i > 0) cell.appendChild(document.createTextNode(', '));
-    const dot = lineDot(name);
-    if (dot) cell.appendChild(dot);
-    cell.appendChild(document.createTextNode(name.trim()));
+    target.line.split('/').forEach((name, j) => {
+      if (j > 0) cell.appendChild(document.createTextNode(', '));
+      const item = el('span', 'tr-name');
+      const dot = lineDot(name);
+      if (dot) item.appendChild(dot);
+      item.appendChild(document.createTextNode(name.trim()));
+      cell.appendChild(item);
+    });
+    if (target.direction) cell.appendChild(document.createTextNode(' ' + target.direction + ' 방면'));
   });
-  if (g.targetDirection) cell.appendChild(document.createTextNode(' ' + g.targetDirection + ' 방면'));
+  return cell;
+}
+
+/** 내릴 문. 좁은 칸에서 줄이 바뀌어도 자리 하나는 쪼개지지 않게 자리마다 묶는다. */
+function buildDoorCell(spots) {
+  const cell = el('span', 'tr-door');
+  spots.forEach((spot, i) => {
+    if (i > 0) cell.appendChild(document.createTextNode(', '));
+    cell.appendChild(el('span', 'tr-spot', spot));
+  });
   return cell;
 }
 
@@ -498,19 +586,32 @@ function lineDot(name) {
   return dot;
 }
 
-/** 같은 방면, 같은 노선으로 가는 문이 여럿이면 한 줄로 합친다 (강남에서 2호선이 그렇다). */
-function groupDoors(doors) {
-  const groups = new Map();
+/**
+ * 한 칸의 한 방면 줄을 합친다. 같은 노선, 같은 방면으로 가는 문을 먼저 모으고(강남에서 2호선이
+ * 그렇다), 문이 같은 노선끼리 다시 한 줄로 묶는다(종로3가 왼쪽 칸의 3호선과 5호선).
+ */
+function mergeDoors(doors) {
+  const byTarget = new Map();
   for (const d of doors) {
-    const key = JSON.stringify([d.trainDirection, d.targetLine, d.targetDirection]);
-    let g = groups.get(key);
+    const key = JSON.stringify([d.targetLine, d.targetDirection]);
+    let g = byTarget.get(key);
     if (!g) {
-      g = { trainDirection: d.trainDirection, targetLine: d.targetLine, targetDirection: d.targetDirection, spots: [] };
-      groups.set(key, g);
+      g = { target: { line: d.targetLine, direction: d.targetDirection }, spots: [] };
+      byTarget.set(key, g);
     }
     g.spots.push(spotLabel(d));
   }
-  return [...groups.values()];
+  const bySpots = new Map();
+  for (const g of byTarget.values()) {
+    const key = JSON.stringify(g.spots);
+    let merged = bySpots.get(key);
+    if (!merged) {
+      merged = { targets: [], spots: g.spots };
+      bySpots.set(key, merged);
+    }
+    merged.targets.push(g.target);
+  }
+  return [...bySpots.values()];
 }
 
 /** 문 하나, 이어진 문 범위, 모든 문 셋 중 하나다. 같은 승강장 건너편에서 갈아타는 역이 뒤의 둘이다. */
@@ -578,7 +679,7 @@ function buildLegend(line) {
     ? '↑ 왼쪽은 ' + line.upLabel + ', ↓ 오른쪽은 ' + line.downLabel + ' 열차입니다. '
     : '↑ 왼쪽은 ' + line.upLabel + ' 방면, ↓ 오른쪽은 ' + line.downLabel + ' 방면입니다. '));
   if (transfersByLine[line.slug]) {
-    p.appendChild(document.createTextNode('밑줄 친 역 이름을 누르면 환승 문 위치가 열립니다.'));
+    p.appendChild(document.createTextNode('밑줄 친 역 이름을 누르면 환승 문 위치가 타고 온 열차 쪽에 열립니다.'));
   }
   return p;
 }

@@ -1,5 +1,6 @@
 package kr.kennysoft.kennymetro.transfer
 
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.assertions.withClue
 import io.kotest.core.spec.style.FreeSpec
 import io.kotest.inspectors.forAll
@@ -9,8 +10,14 @@ import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
+import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldStartWith
 import kr.kennysoft.kennymetro.TestLines
+import kr.kennysoft.kennymetro.config.LineConfig
+import kr.kennysoft.kennymetro.config.MetroProperties
+import kr.kennysoft.kennymetro.domain.Direction
+import kr.kennysoft.kennymetro.domain.LineCatalog
+import kr.kennysoft.kennymetro.domain.LineSource
 
 class TransferDoorRepositoryTest : FreeSpec({
 
@@ -116,5 +123,109 @@ class TransferDoorRepositoryTest : FreeSpec({
         // then
         stations.single { it.station == "미금" }.note.shouldNotBeNull()
         stations.single { it.station == "강남" }.note.shouldBeNull()
+    }
+
+    "환승 줄을 지금 탄 열차가 가는 쪽의 칸에 둔다" {
+        // given - 1호선 종로3가. 열차 방면이 원문의 열 제목이라 화면의 좌우 이름(연천, 인천)과 글자가 다르다.
+        val jongno = repository.findByLine(TestLines.bySlug("line1-gyeongin")).stations.single { it.station == "종로3가" }
+
+        // when
+        val sides = jongno.doors.map { it.trainDirection to it.side }.toSet()
+
+        // then
+        sides shouldBe setOf("연천/광운대" to Direction.UP, "인천/신창" to Direction.DOWN)
+    }
+
+    "급행이나 셔틀이 붙은 방면도 거기 적힌 역으로 칸을 가린다" {
+        // given - 1호선 신도림. 광명은 어느 뷰의 목록에도 없어 금천구청에서 갈라진다는 것으로 자리를 안다.
+        val sindorim = repository.findByLine(TestLines.bySlug("line1-gyeongbu")).stations.single { it.station == "신도림" }
+
+        // when
+        val sides = sindorim.doors.map { it.trainDirection to it.side }.toSet()
+
+        // then
+        sides shouldBe setOf(
+            "연천/광운대" to Direction.UP,
+            "인천/신창" to Direction.DOWN,
+            "용산 특급과 급행" to Direction.UP,
+            "동인천 특급과 급행" to Direction.DOWN,
+            "광명셔틀 영등포" to Direction.UP,
+            "광명셔틀 광명" to Direction.DOWN,
+        )
+    }
+
+    "지금 역에서 갈라져 나가는 종착역은 그 역을 담은 뷰에서 칸을 가린다" {
+        // given - 5호선 마천 뷰의 강동. 하남검단산행은 바로 이 역에서 갈라져 이 뷰만으로는 자리가 같다.
+        val gangdong = repository.findByLine(TestLines.bySlug("line5-macheon")).stations.single { it.station == "강동" }
+
+        // when
+        val sides = gangdong.doors.map { it.trainDirection to it.side }.toSet()
+
+        // then
+        sides shouldBe setOf("방화" to Direction.UP, "하남검단산" to Direction.DOWN)
+    }
+
+    "순환선은 외선과 내선으로 칸을 가린다" {
+        // given - 2호선은 끝이 없어 자리를 견줄 수 없다. 원문도 방면을 외선과 내선으로 적는다.
+        val doors = repository.findByLine(TestLines.line2).stations.flatMap { it.doors }
+
+        // when & then
+        doors.map { it.trainDirection to it.side }.toSet() shouldBe setOf("외선" to Direction.UP, "내선" to Direction.DOWN)
+    }
+
+    "방면 없는 줄은 열차가 들어오는 쪽에만 둔다" {
+        // given - 수인분당선 청량리와 인천은 노선 끝이라 열차가 한쪽으로만 들어온다.
+        val stations = repository.findByLine(TestLines.bySlug("suinbundang")).stations
+
+        // when
+        val cheongnyangni = stations.single { it.station == "청량리" }.doors.map { it.side }
+        val incheon = stations.single { it.station == "인천" }.doors.map { it.side }
+
+        // then
+        cheongnyangni shouldBe listOf(Direction.UP)
+        incheon shouldBe listOf(Direction.DOWN)
+    }
+
+    "한 방향으로만 도는 구간의 방면 없는 줄은 그쪽에만 둔다" {
+        // given - 6호선 응암 순환 구간은 한 방향으로만 돌아 불광에는 신내 방면 열차만 들어온다.
+        val bulgwang = repository.findByLine(TestLines.bySlug("line6")).stations.single { it.station == "불광" }
+
+        // when & then
+        bulgwang.doors.map { it.side } shouldBe listOf(Direction.DOWN, Direction.DOWN)
+    }
+
+    "방면 없는 줄이 중간역에 있으면 양쪽에 둔다" {
+        // given - 8호선 구리는 어느 쪽으로 가든 같은 문이다.
+        val guri = repository.findByLine(TestLines.bySlug("line8")).stations.single { it.station == "구리" }
+
+        // when & then
+        guri.doors.map { it.side } shouldBe listOf(null, null)
+    }
+
+    "열차 방면으로 칸을 가릴 수 없으면 기동이 실패한다" {
+        // given - 방면에 노선의 역이 하나도 없다. 조용히 양쪽에 두면 틀린 칸이 화면에 남는다.
+        val catalog = LineCatalog(
+            MetroProperties(
+                listOf(
+                    LineConfig(
+                        slug = "test",
+                        name = "테스트선",
+                        color = "#000000",
+                        source = LineSource.SEOUL,
+                        upLabel = "가",
+                        downLabel = "다",
+                        stations = listOf("가", "나", "다"),
+                        transferFile = "broken-side",
+                    )
+                )
+            )
+        )
+
+        // when
+        val error = shouldThrow<IllegalArgumentException> { TransferDoorRepository(catalog) }
+
+        // then - 어느 파일의 어느 방면인지 알려야 한다.
+        error.message shouldContain "broken-side-doors.csv"
+        error.message shouldContain "없는역"
     }
 })

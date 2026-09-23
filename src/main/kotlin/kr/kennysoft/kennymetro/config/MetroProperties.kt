@@ -63,6 +63,11 @@ data class LineConfig(
      */
     val beyond: Map<String, String> = emptyMap(),
     /**
+     * 열차가 down 쪽으로만 지나는 역. 6호선 응암 순환 구간이 한 방향으로만 돈다. 방면 없이 적힌
+     * 환승 문을 화면의 어느 칸에 둘지 정하는 데 쓴다.
+     */
+    val downOnly: List<String> = emptyList(),
+    /**
      * 환승 문 파일 이름(`transfer/<이름>-doors.csv`). 적지 않으면 slug 다. 지선마다 뷰를 둔
      * 노선은 원본 문서가 하나라 파일도 하나를 나눠 쓴다.
      */

@@ -9,12 +9,20 @@ package kr.kennysoft.kennymetro.domain
  * `targetDirection` 이 null 이면 갈아타서 어느 쪽으로 가든 같은 문이라는 뜻이다.
  *
  * <p>
+ * `side` 는 화면의 어느 칸에 둘지다. 지금 탄 열차가 역 목록 앞쪽으로 가면 UP(왼쪽 칸), 뒤쪽으로
+ * 가면 DOWN(오른쪽 칸)이고, null 이면 양쪽이다. `trainDirection` 은 원문의 열 제목이라 화면의
+ * 좌우 이름과 글자가 달라("연천/광운대", "용산 급행") 서버가 역의 자리로 가려 둔다
+ * (`TransferDoorRepository`). `trainDirection` 이 null 이어도 열차가 한쪽으로만 들어오는 역
+ * (시종착역, 6호선 순환 구간)이면 그쪽이다.
+ *
+ * <p>
  * 자리는 세 가지다. `car` 와 `door` 만 있으면 그 문 하나이고, `toCar` 와 `toDoor` 까지 있으면
  * 앞 자리부터 그 자리까지 이어진 모든 문이다. 넷 다 null 이면 어느 문에서 내려도 된다. 뒤의
  * 둘은 같은 승강장 건너편에서 갈아타는 역에서 나온다(4호선 한대앞에서 수인분당선이 그렇다).
  */
 data class TransferDoor(
     val trainDirection: String?,
+    val side: Direction?,
     val targetLine: String,
     val targetDirection: String?,
     val car: Int?,
