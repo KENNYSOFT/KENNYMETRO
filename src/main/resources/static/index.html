@@ -15,6 +15,11 @@
     --edge: #e4e4e7;
     --warn-bg: #fff4e5;
     --warn-fg: #9a3412;
+    --ext-bg: #e0f2fe;
+    --ext-fg: #075985;
+    --express: #dc2626;
+    --arrow-up: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='14' viewBox='0 0 22 14'%3E%3Cpath d='M3 11 11 3l8 8' fill='none' stroke='%23a1a1aa' stroke-opacity='.45' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    --arrow-down: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='14' viewBox='0 0 22 14'%3E%3Cpath d='M3 3l8 8 8-8' fill='none' stroke='%23a1a1aa' stroke-opacity='.45' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -26,6 +31,11 @@
       --edge: #2a2a2e;
       --warn-bg: #3b2410;
       --warn-fg: #fdba74;
+      --ext-bg: #0c2a3d;
+      --ext-fg: #7dd3fc;
+      --express: #ef4444;
+      --arrow-up: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='14' viewBox='0 0 22 14'%3E%3Cpath d='M3 11 11 3l8 8' fill='none' stroke='%2371717a' stroke-opacity='.6' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+      --arrow-down: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='14' viewBox='0 0 22 14'%3E%3Cpath d='M3 3l8 8 8-8' fill='none' stroke='%2371717a' stroke-opacity='.6' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
     }
   }
   * { box-sizing: border-box; }
@@ -53,7 +63,6 @@
   .line-status { font-size: 12px; color: var(--muted); }
   .line-body { padding-top: 6px; }
   .legend { font-size: 12px; color: var(--muted); margin: 0 0 10px; }
-  .legend b { color: var(--warn-fg); background: var(--warn-bg); padding: 1px 5px; border-radius: 4px; font-weight: 600; }
 
   /* 편성 차수 범례. 색이 무엇을 뜻하는지 여기서만 말한다. */
   .fleet-legend { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; font-size: 12px; margin: 0 0 10px; }
@@ -69,34 +78,71 @@
   .credits { margin-top: 10px; font-size: 11px; color: var(--muted); line-height: 1.7; }
   .credits a { color: inherit; }
 
-  .rail { position: relative; }
+  /* 역 이름 칸의 너비(--name-w)는 그 노선에서 가장 긴 이름에 맞춰 스크립트가 정한다.
+     고정 폭이면 "디지털미디어시티" 가 두 줄로 쪼개진다. em 이라 글자 크기를 따라가도록
+     레일 전체의 글자 크기를 여기서 한 번 정한다. */
+  .rail { position: relative; font-size: 13px; --name-w: 8em; }
   .rail::before {
     content: ""; position: absolute; left: 50%; top: 10px; bottom: 10px;
     width: 2px; margin-left: -1px; background: var(--rail);
   }
-  .stop { display: grid; grid-template-columns: 1fr 104px 1fr; align-items: center; min-height: 38px; }
+  /* 방향. 왼쪽 칸의 열차는 목록 위쪽으로, 오른쪽 칸은 아래쪽으로 간다. 칸 뒤에 옅은 화살표를 깐다.
+     열차 칩이 불투명해 칩이 없는 자리에서만 보인다. */
+  .dir {
+    position: absolute; top: 0; bottom: 0; pointer-events: none;
+    background-repeat: repeat-y; background-position: center 12px; background-size: 22px 57px;
+  }
+  .dir.up { left: 0; right: calc(50% + var(--name-w) / 2); background-image: var(--arrow-up); }
+  .dir.down { right: 0; left: calc(50% + var(--name-w) / 2); background-image: var(--arrow-down); }
+  .stop { display: grid; grid-template-columns: 1fr var(--name-w) 1fr; align-items: center; min-height: 38px; }
   /* 레일 선이 역 이름 뒤로 지나간다. 이름에 배경을 깔아 선을 끊어 보이게 하는데,
      선이 absolute 라 그것만으로는 글자 위에 그려진다. 쌓임 순서를 올려 덮는다. */
-  .name { text-align: center; font-size: 13px; }
+  .name { text-align: center; word-break: keep-all; }
   .name span, .name button {
     position: relative; z-index: 1;
     background: var(--bg); padding: 2px 6px; border-radius: 4px;
   }
   .name .key { font-weight: 700; }
-  .lane { display: flex; gap: 6px; flex-wrap: wrap; min-height: 24px; align-items: center; }
+  .lane { display: flex; gap: 6px; flex-wrap: wrap; min-height: 24px; align-items: center; min-width: 0; }
   .lane.up { justify-content: flex-end; }
   .lane.down { justify-content: flex-start; }
 
+  /* 칩 안의 조각이 넘치면 줄을 바꾼다. 종착역이 긴 노선(9호선 중앙보훈병원행)이 좁은 화면에서
+     옆 칸을 밀어내지 않게 하려는 것이다. 열차번호가 먼저 아랫줄로 내려간다. */
   .train {
+    position: relative; z-index: 1;
+    display: inline-flex; flex-wrap: wrap; align-items: baseline; column-gap: 4px;
+    max-width: 100%;
     background: var(--card); border-radius: 6px; padding: 3px 8px;
-    font-size: 12px; white-space: nowrap; line-height: 1.35;
+    font-size: 12px; line-height: 1.35;
   }
-  /* 차수 색은 왼쪽 막대로만 쓴다. 칩 배경을 물들이면 단축 운행 표시와 겹친다. */
+  .train .no { color: var(--muted); font-size: 11px; }
+  /* 급행은 칩 배경과 따로 표시한다. 배경은 단축, 연장 같은 운행 범위가 쓰므로 둘이 겹쳐도 갈린다. */
+  .train .exp {
+    align-self: center; background: var(--express); color: #fff;
+    font-size: 10px; font-weight: 700; line-height: 1; padding: 3px 4px; border-radius: 3px;
+  }
+  .train .tag { font-size: 11px; font-weight: 600; color: var(--warn-fg); }
+  /* 차수 색은 왼쪽 막대로만 쓴다. 칩 배경을 물들이면 운행 범위 표시와 겹친다. */
   .train.fleet { border-left: 3px solid var(--fleet); padding-left: 5px; }
   .train.short { background: var(--warn-bg); color: var(--warn-fg); font-weight: 600; }
-  .train .no { color: var(--muted); font-size: 11px; margin-left: 4px; }
-  .train.express::before { content: "급행 "; font-size: 11px; font-weight: 600; }
-  .train.last::after { content: " 막차"; font-size: 11px; color: var(--warn-fg); }
+  .train.ext { background: var(--ext-bg); color: var(--ext-fg); font-weight: 600; }
+  .train.branch { background: var(--bg); border: 1px dashed var(--muted); padding: 2px 7px; }
+  .train.short .no, .train.ext .no { color: inherit; opacity: .7; }
+
+  /* 범례. 지금 그려진 열차에 있는 것만 적는다. 나올 수 없는 운행까지 적으면 설명이 아니라 소음이다. */
+  .kinds { display: flex; gap: 6px 12px; flex-wrap: wrap; align-items: center; font-size: 12px; color: var(--muted); margin: -4px 0 10px; }
+  /* display 를 정한 요소는 hidden 속성이 먹지 않는다. */
+  .kinds[hidden] { display: none; }
+  .kinds .train { font-size: 11px; padding: 1px 6px; }
+  .kinds .train.branch { padding: 0 5px; }
+
+  @media (max-width: 480px) {
+    .rail { font-size: 12px; }
+    .train { font-size: 11px; padding: 2px 6px; column-gap: 3px; }
+    .train.branch { padding: 1px 5px; }
+    .lane { gap: 4px; }
+  }
 
   .scope { font-size: 12px; color: var(--muted); margin-top: 8px; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
   .scope button, .pick button, .set button {
@@ -280,11 +326,32 @@ function rangeOf(line) {
   return focus;
 }
 
+/**
+ * 역 이름 칸의 너비. 그려질 역 가운데 가장 긴 이름에 맞춘다.
+ *
+ * 한글은 한 글자가 대략 1em 이고 숫자와 영문은 그보다 좁다. 굵게 세우는 주요 역이 조금 더
+ * 넓어 여유를 둔다. 아주 긴 이름(동대문역사문화공원)도 한 줄에 들어가되 양옆 칸이 너무
+ * 좁아지지 않게 상한을 둔다.
+ */
+function nameWidth(names) {
+  let widest = 0;
+  for (const name of names) {
+    let w = 0;
+    for (const ch of name) w += /[가-힣]/.test(ch) ? 1 : 0.62;
+    widest = Math.max(widest, w);
+  }
+  const em = Math.min(Math.max(widest * 1.06, 4), 10);
+  return 'calc(' + em.toFixed(2) + 'em + 16px)';
+}
+
 function buildRail(line) {
   const rail = el('div', 'rail');
   const range = rangeOf(line);
   const transfers = transfersByLine[line.slug];
   const keys = keysOf(line);
+  rail.style.setProperty('--name-w', nameWidth(line.stations.slice(range.from, range.to + 1)));
+  rail.appendChild(el('div', 'dir up'));
+  rail.appendChild(el('div', 'dir down'));
   for (let i = range.from; i <= range.to; i++) {
     const name = line.stations[i];
     const stop = el('div', 'stop');
@@ -310,6 +377,7 @@ function placeTrains(section, line, trains) {
   section.querySelectorAll('.lane').forEach(l => l.replaceChildren());
   const range = rangeOf(line);
   let outside = 0;
+  const placed = [];
   for (const t of trains) {
     const idx = line.stations.indexOf(t.currentStation);
     if (idx < 0) continue;
@@ -318,25 +386,54 @@ function placeTrains(section, line, trains) {
     if (!stop) continue;
     const lane = stop.querySelector(t.direction === 'UP' ? '.lane.up' : '.lane.down');
     lane.appendChild(trainChip(line, t));
+    placed.push(t);
   }
+  renderKinds(section, placed);
   return outside;
 }
 
+/** 운행 종류마다 칩에 붙일 이름과 범례에 적을 설명. 평소 운행은 표시하지 않는다. */
+const KINDS = {
+  SHORT: { cls: 'short', label: '단축', note: '평소 종착역보다 먼저 끝납니다' },
+  EXTENSION: { cls: 'ext', label: '연장', note: '평소 종착역을 지나 더 갑니다' },
+  BRANCH: { cls: 'branch', label: '다른 계통', note: '이 노선을 지나다 갈라져 나갑니다' },
+};
+
 function trainChip(line, t) {
+  const kind = KINDS[t.service];
   let cls = 'train';
-  if (t.isShortTurn) cls += ' short';
-  if (t.isLastTrain) cls += ' last';
-  if (t.isExpress) cls += ' express';
+  if (kind) cls += ' ' + kind.cls;
   if (t.fleet) cls += ' fleet';
   const chip = el('div', cls);
+  const title = [];
   if (t.fleet) {
     const gen = line.fleet.generations.find(g => g.label === t.fleet);
     if (gen) chip.style.setProperty('--fleet', gen.color);
-    chip.title = t.fleet;
+    title.push(t.fleet);
   }
-  chip.appendChild(document.createTextNode(t.destination + '행'));
+  if (kind) title.push(kind.label + ': ' + kind.note);
+  if (t.isExpress) chip.appendChild(el('span', 'exp', '급행'));
+  chip.appendChild(el('span', 'dst', t.destination + '행'));
+  if (t.isLastTrain) chip.appendChild(el('span', 'tag', '막차'));
   chip.appendChild(el('span', 'no', t.trainNo));
+  if (title.length) chip.title = title.join('\n');
   return chip;
+}
+
+/** 지금 그려진 열차에 있는 운행 종류만 범례로 적는다. */
+function renderKinds(section, trains) {
+  const box = section.querySelector('.kinds');
+  if (!box) return;
+  const present = new Set(trains.map(t => t.service));
+  box.replaceChildren();
+  for (const [service, kind] of Object.entries(KINDS)) {
+    if (!present.has(service)) continue;
+    const item = el('span');
+    item.appendChild(el('span', 'train ' + kind.cls, kind.label));
+    item.appendChild(document.createTextNode(' ' + kind.note));
+    box.appendChild(item);
+  }
+  box.hidden = box.children.length === 0;
 }
 
 /* ---------- 환승 ---------- */
@@ -439,6 +536,9 @@ function buildSection(line) {
 
   const body = el('div', 'line-body');
   body.appendChild(buildLegend(line));
+  const kinds = el('div', 'kinds');
+  kinds.hidden = true;
+  body.appendChild(kinds);
   if (line.fleet) body.appendChild(buildFleetLegend(line));
   body.appendChild(buildRail(line));
   body.appendChild(buildTools(line));
@@ -466,14 +566,13 @@ function buildSection(line) {
 
 function buildLegend(line) {
   const p = el('p', 'legend');
-  p.appendChild(document.createTextNode(
-    '왼쪽이 ' + line.upLabel + ' 방면, 오른쪽이 ' + line.downLabel + ' 방면입니다. '));
-  if (!line.circular) {
-    const b = el('b', null, '단축 운행');
-    p.appendChild(b);
-    p.appendChild(document.createTextNode('은 노선 끝까지 가지 않는 열차입니다. '));
+  // 순환선은 방면 대신 외선과 내선으로 갈린다.
+  p.appendChild(document.createTextNode(line.circular
+    ? '↑ 왼쪽은 ' + line.upLabel + ', ↓ 오른쪽은 ' + line.downLabel + ' 열차입니다. '
+    : '↑ 왼쪽은 ' + line.upLabel + ' 방면, ↓ 오른쪽은 ' + line.downLabel + ' 방면입니다. '));
+  if (transfersByLine[line.slug]) {
+    p.appendChild(document.createTextNode('밑줄 친 역 이름을 누르면 환승 문 위치가 열립니다.'));
   }
-  p.appendChild(document.createTextNode('밑줄 친 역 이름을 누르면 환승 문 위치가 열립니다.'));
   return p;
 }
 
