@@ -128,6 +128,31 @@ class LineCatalogTest {
     }
 
     @Test
+    fun `대괄호를 빠뜨려 키가 지워진 역명 치환은 기동이 실패한다`() {
+        // given - relaxed binding 이 한글 키를 지우면 빈 키가 된다. 조용히 넘어가면 그 역의 열차가 사라진다.
+        val broken = MetroProperties(
+            lines = listOf(
+                LineConfig(
+                    slug = "test",
+                    name = "테스트선",
+                    color = "#000000",
+                    source = LineSource.SEOUL,
+                    upLabel = "위",
+                    downLabel = "아래",
+                    stations = listOf("가", "나"),
+                )
+            ),
+            stationAliases = mapOf("" to "가"),
+        )
+
+        // when
+        val error = assertFailsWith<IllegalArgumentException> { LineCatalog(broken) }
+
+        // then
+        assertTrue(error.message!!.contains("대괄호"), "무엇을 고칠지 알려야 한다: ${error.message}")
+    }
+
+    @Test
     fun `역이 중복되면 기동이 실패한다`() {
         // given
         val broken = MetroProperties(

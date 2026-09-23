@@ -25,6 +25,11 @@ data class MetroProperties(
     val preset: List<String> = emptyList(),
     /** 환승 대상 노선의 색. 우리가 담지 않는 노선까지 들어 있어 노선 정의와 따로 둔다. */
     val transferColors: Map<String, String> = emptyMap(),
+    /**
+     * 실시간 API 가 우리와 이름부터 다르게 적는 역. 키가 API 쪽, 값이 우리 목록의 표기다.
+     * 괄호 부기와 2호선 꼬리말은 여기 적지 않아도 떼어진다(`StationNames`).
+     */
+    val stationAliases: Map<String, String> = emptyMap(),
 )
 
 data class LineConfig(
@@ -45,6 +50,13 @@ data class LineConfig(
     val keyStations: List<String> = emptyList(),
     /** 편성번호로 차량을 특정할 수 있는 노선에만 있다. */
     val fleet: FleetConfig? = null,
+    /** 이 노선 열차가 평소 가는 종착역. 비어 있으면 역 목록의 양 끝이다. */
+    val termini: List<String> = emptyList(),
+    /**
+     * 어느 뷰의 목록에도 없는 종착역과, 그 열차가 이 뷰를 떠나는 역. 1호선 서동탄행은
+     * 병점에서 갈라진다. 형제 뷰에 있는 종착역은 적지 않아도 저절로 계산된다.
+     */
+    val beyond: Map<String, String> = emptyMap(),
 )
 
 data class FleetConfig(

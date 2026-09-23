@@ -42,14 +42,63 @@ data class Line(
     val focusTo: Int?,
     val keyStations: List<String>,
     val fleet: Fleet?,
+    /**
+     * 이 노선 열차가 평소 가는 종착역. 여기 없는 목록 안의 종착역은 그 사이면 단축, 바깥이면
+     * 연장이다. 수인분당선은 왕십리가 평소 종착이라 청량리행이 연장으로 잡힌다.
+     */
+    val termini: Set<String>,
+    /**
+     * 목록에 없는 종착역이 이 뷰에서 닿는 자리.
+     *
+     * <p>
+     * 1호선 경인 뷰에서 신창행은 구로까지 같은 선로를 달린다. 그 열차를 버리면 종각에서
+     * 영등포로 가려는 사람이 탈 수 있는 열차의 절반을 못 본다. 그래서 갈라지는 역을 종착처럼
+     * 두고 방향을 정한다. 형제 뷰(같은 API 노선)의 역에서 저절로 계산되고, 어느 뷰에도 없는
+     * 종착역(서동탄, 광명)은 lines.yml 의 beyond 로 적는다.
+     */
+    val anchors: Map<String, Destination>,
 ) {
 
     /** 실시간 위치를 공유하는 단위. 이 값이 같으면 호출도 캐시도 한 벌이다. */
     val cacheKey: String get() = "$source:$apiName"
 
+    private val terminiIndices: List<Int> = termini.mapNotNull { indexOf(it) }
+
     /** 역이 노선에서 몇 번째인지. 모르는 역이면 null. */
     fun indexOf(station: String): Int? = stations.indexOf(station).takeIf { it >= 0 }
+
+    /** 그 종착역으로 가는 열차가 이 뷰에서 어디를 향하고 어떤 운행인지. 모르는 종착역이면 null. */
+    fun destinationOf(name: String): Destination? {
+        val own = indexOf(name) ?: return anchors[name]
+        return Destination(own, serviceAt(own))
+    }
+
+    /** 목록 안의 역을 종착으로 하는 열차가 어떤 운행인지. */
+    fun serviceAt(index: Int): ServiceKind {
+        if (circular || stations[index] in termini) return ServiceKind.NORMAL
+        return if (index < terminiIndices.min() || index > terminiIndices.max()) ServiceKind.EXTENSION else ServiceKind.SHORT
+    }
 }
+
+/**
+ * 열차가 그 뷰에서 어떻게 달리는지. 화면이 색으로 가른다.
+ */
+enum class ServiceKind {
+    /** 평소 가는 종착역까지 간다. */
+    NORMAL,
+
+    /** 평소 종착역보다 먼저 끝난다. 타기 전에 알아야 한다. */
+    SHORT,
+
+    /** 평소 종착역을 지나 더 간다. 드물게 있는 운행이라 알아볼 수 있어야 한다. */
+    EXTENSION,
+
+    /** 이 뷰의 역을 지나다 다른 계통으로 갈라져 나간다. */
+    BRANCH,
+}
+
+/** 종착역이 이 뷰의 몇 번째 역에 닿는지와 그 운행의 종류. */
+data class Destination(val index: Int, val service: ServiceKind)
 
 /**
  * 편성번호로 차량을 특정할 수 있는 노선의 도입 차수.

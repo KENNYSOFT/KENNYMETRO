@@ -51,8 +51,8 @@ class TrainTest {
         val full = position(current = "강남", terminal = "광교", updnLine = "1")
 
         // when & then
-        assertTrue(shortTurn.toTrain(TestLines.shinbundang)!!.isShortTurn)
-        assertTrue(!full.toTrain(TestLines.shinbundang)!!.isShortTurn)
+        assertEquals(ServiceKind.SHORT, shortTurn.toTrain(TestLines.shinbundang)!!.service)
+        assertEquals(ServiceKind.NORMAL, full.toTrain(TestLines.shinbundang)!!.service)
     }
 
     @Test

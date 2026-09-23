@@ -2,6 +2,7 @@
 build/
 out/
 .gradle/
+.kotlin/
 __pycache__/
 
 # 런타임이 쓰는 것. 로컬 캐시와 호출 원장이 여기 쌓인다.

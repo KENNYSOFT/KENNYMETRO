@@ -25,6 +25,7 @@ class LineController(
         lines = ArrayList(catalog.all().map { it.toView() }),
         preset = ArrayList(catalog.preset()),
         transferColors = LinkedHashMap(catalog.transferColors()),
+        stationAliases = LinkedHashMap(catalog.stationAliases()),
         apiCallBudget = properties.dailyCallBudget,
         apiCallCount = trainPositionService.apiCallCount(),
     )
@@ -45,6 +46,7 @@ class LineController(
         fleet = fleet,
         // 용인경전철은 다른 엔드포인트라 하루 1,000회 예산에 들지 않는다.
         budgeted = source == LineSource.SEOUL,
+        extraDestinations = ArrayList(anchors.keys),
     )
 }
 
@@ -54,6 +56,8 @@ data class LinesResponse(
     val preset: List<String>,
     /** 환승 문 위치에 노선 동그라미를 붙이는 데 쓴다. */
     val transferColors: Map<String, String>,
+    /** API 가 우리와 다르게 적는 역명. `scripts/probe-coverage.sh` 가 역명을 대조할 때 쓴다. */
+    val stationAliases: Map<String, String>,
     val apiCallBudget: Int,
     val apiCallCount: Long,
 )
@@ -72,4 +76,9 @@ data class LineView(
     val keyStations: List<String>,
     val fleet: Fleet?,
     val budgeted: Boolean,
+    /**
+     * 역 목록에는 없지만 이 뷰가 알아듣는 종착역. 다른 계통으로 갈라지거나 목록 밖으로 더 가는
+     * 열차의 종착이다. `scripts/probe-coverage.sh` 가 역명을 대조할 때 오탐을 막는 데 쓴다.
+     */
+    val extraDestinations: List<String>,
 )

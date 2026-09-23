@@ -19,7 +19,9 @@ set -euo pipefail
 : "${SEOUL_SUBWAY_KEY:?실시간 지하철 인증키를 SEOUL_SUBWAY_KEY 환경변수로 넘길 것}"
 APP="${APP:-https://metro.kennysoft.kr}"
 
-BASE="http://swopenapi.seoul.go.kr/api/subway/${SEOUL_SUBWAY_KEY}/json"
+# 앱과 같은 이름의 변수로 API 주소를 바꿀 수 있다. 받아 둔 응답을 돌려주는 stub 으로
+# 이 스크립트 자체를 시험할 때 쓴다.
+BASE="${SEOUL_SUBWAY_BASE_URL:-http://swopenapi.seoul.go.kr/api/subway}/${SEOUL_SUBWAY_KEY}/json"
 CALLS=0
 
 urlencode() {
@@ -39,10 +41,20 @@ printf '실행 시각: %s\n앱: %s\n\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$APP"
 lines=$(curl -sS --max-time 20 "$APP/api/lines") || { echo "앱에서 노선 목록을 받지 못했다: $APP" >&2; exit 1; }
 
 # 화면에서 갈라 놓은 뷰도 API 로는 한 노선이다. api-name 으로 묶고 역 목록은 합친다.
+# 목록 밖이지만 서버가 알아듣는 종착역(서동탄, 광운대 같은 것)도 함께 넣는다.
+# Windows 용 jq 는 줄 끝에 \r 을 붙인다. 그대로 두면 모든 역명이 우리 목록과 어긋나 보인다.
 targets=$(printf '%s' "$lines" | jq -r '
   [.lines[] | select(.budgeted)]
   | group_by(.apiName)[]
-  | (.[0].apiName) + "\t" + ((map(.stations) | add | unique) | join(","))')
+  | (.[0].apiName) + "\t" + ((map(.stations + .extraDestinations) | add | unique) | join(","))' | tr -d '\r')
+aliases=$(printf '%s' "$lines" | jq -c '.stationAliases' | tr -d '\r')
+
+# 서버(StationNames)와 같은 규칙으로 역명을 옮긴다. 괄호 부기와 2호선 꼬리말을 떼고,
+# 이름부터 다른 역은 station-aliases 로 바꾼다. 규칙이 어긋나면 이 스크립트가 오탐을 낸다.
+NORMALIZE='def norm($a):
+  (split("(")[0] | sub("\\s+$"; "")) as $b
+  | (if ($b | test(".(종착|지선)$")) then ($b | sub("(종착|지선)$"; "")) else $b end) as $s
+  | if $a[$s] then $a[$s] else $s end;'
 
 printf '%-14s %-6s %s\n' "노선" "열차수" "표본 (열차번호 / 현재역 / 종착)"
 printf '%s\n' "----------------------------------------------------------------------"
@@ -63,13 +75,19 @@ while IFS=$'\t' read -r name stations; do
   sample=$(printf '%s' "$resp" | jq -r '.realtimePositionList[0] | "\(.trainNo) / \(.statnNm) / \(.statnTnm)"' 2>/dev/null || echo "-")
   printf '%-14s %-6s %s\n' "$name" "$count" "$sample"
 
-  # API 가 준 역명 중 우리 목록에 없는 것. 여기 찍히면 lines.yml 을 그 표기로 고친다.
-  unknown=$(comm -23 \
-    <(printf '%s' "$resp" | jq -r '.realtimePositionList[]?.statnNm' | sort -u) \
-    <(printf '%s' "$stations" | tr ',' '\n' | sort -u))
-  if [ -n "$unknown" ]; then
+  # API 가 준 역명 중 우리가 모르는 것. 현재역이 모르는 역이면 그 열차가, 종착역이 모르는
+  # 역이면 그 역으로 가는 열차 전부가 화면에서 빠진다. 여기 찍히면 lines.yml 을 고친다.
+  known=$(printf '%s' "$stations" | tr ',' '\n' | sort -u)
+  unknown_current=$(comm -23 \
+    <(printf '%s' "$resp" | jq -r --argjson a "$aliases" "$NORMALIZE"' .realtimePositionList[]? | .statnNm | norm($a)' | tr -d '\r' | sort -u) \
+    <(printf '%s\n' "$known"))
+  unknown_terminal=$(comm -23 \
+    <(printf '%s' "$resp" | jq -r --argjson a "$aliases" "$NORMALIZE"' .realtimePositionList[]? | .statnTnm | norm($a)' | tr -d '\r' | sort -u) \
+    <(printf '%s\n' "$known"))
+  if [ -n "$unknown_current" ] || [ -n "$unknown_terminal" ]; then
     unknown_total=$((unknown_total + 1))
-    printf '  모르는 역: %s\n' "$(printf '%s' "$unknown" | tr '\n' ' ')"
+    [ -n "$unknown_current" ] && printf '  모르는 현재역: %s\n' "$(printf '%s' "$unknown_current" | tr '\n' ' ')"
+    [ -n "$unknown_terminal" ] && printf '  모르는 종착역: %s\n' "$(printf '%s' "$unknown_terminal" | tr '\n' ' ')"
   fi
 done <<< "$targets"
 
@@ -83,5 +101,5 @@ printf '\n서울시 API 호출: %d회 (일일 한도 1000)\n' "$CALLS"
 printf '판정: 열차수 0 인 노선은 이 시간대에 운행이 없거나 API 가 담지 않는다.\n'
 printf '      같은 시간대에 다른 노선이 열차를 반환하는데 특정 노선만 0 이면 미수록 쪽이다.\n'
 if [ "$unknown_total" -gt 0 ]; then
-  printf '      역명이 어긋난 노선이 %d개 있다. 위 "모르는 역" 을 lines.yml 에 반영할 것.\n' "$unknown_total"
+  printf '      역명이 어긋난 노선이 %d개 있다. 위 "모르는 현재역" 과 "모르는 종착역" 을 lines.yml 에 반영할 것.\n' "$unknown_total"
 fi
