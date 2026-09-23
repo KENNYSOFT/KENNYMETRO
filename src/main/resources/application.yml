@@ -7,6 +7,19 @@ spring:
   threads:
     virtual:
       enabled: true
+  web:
+    resources:
+      # 화면(HTML, SVG)을 이미지 밖 볼륨에서 먼저 찾는다. 화면만 고친 변경은 native 재빌드 없이 파일만
+      # 올려 반영한다(README 의 "화면만 고칠 때"). 볼륨이 없는 환경(로컬 실행, 테스트)은 뒤의
+      # classpath 로 떨어진다. 상대 경로라 호출 원장처럼 작업 디렉토리 기준이고, 컨테이너에서는
+      # /app/data/static 이다.
+      static-locations:
+        - file:${KENNYMETRO_STATIC_ROOT:data/static}/
+        - classpath:/static/
+      cache:
+        # 파일을 바꾸면 바로 보이도록 브라우저가 매번 바뀌었는지 묻게 한다. 그대로면 304 로 끝난다.
+        cachecontrol:
+          no-cache: true
 
 server:
   port: 8080

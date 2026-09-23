@@ -18,6 +18,8 @@ FAVICON=$(mktemp)
 # 호출 원장. 하위 디렉터리를 일부러 끼워, 없는 경로를 앱이 만들어 쓰는지까지 본다.
 LEDGER_DIR=$(mktemp -d)
 LEDGER="$LEDGER_DIR/nested/api-calls.log"
+# 화면만 올리는 배포의 볼륨. 2라운드에서만 앱에 넘긴다.
+STATIC_ROOT=$(mktemp -d)
 
 cleanup() {
   status=$?
@@ -34,7 +36,7 @@ cleanup() {
     cat "$STUB_LOG" >&2
   fi
   rm -f "$LOG" "$STUB_LOG" "$FAVICON"
-  rm -rf "$LEDGER_DIR"
+  rm -rf "$LEDGER_DIR" "$STATIC_ROOT"
 }
 trap cleanup EXIT
 
@@ -137,13 +139,20 @@ grep -q "^$DAY_BEFORE 1$" "$LEDGER" || fail "오늘 호출 수가 원장에 없�
 curl -sf "$BASE/favicon.svg" -o "$FAVICON" || fail "favicon 을 받지 못했다"
 python3 -c 'import sys, xml.etree.ElementTree as ET; ET.parse(sys.argv[1])' "$FAVICON" \
   || fail "favicon.svg 가 XML 로 파싱되지 않는다"
+
+# 첫 화면. 볼륨이 없으면 이미지에 담긴 화면이 나와야 한다.
+curl -sf "$BASE/" | grep -q '<title>수도권 전철 실시간</title>' || fail "첫 화면이 이미지에 담긴 화면이 아니다"
+# 화면만 올렸을 때 바로 보이도록 브라우저가 매번 바뀌었는지 묻게 한다.
+curl -sfI "$BASE/index.html" | grep -qi '^cache-control:.*no-cache' || fail "화면에 Cache-Control: no-cache 가 없다"
 echo "  통과"
 
 stop_all
 
 # 2라운드: 운행 종료 시간대. 빈 목록이 native 에서 직렬화되는지 본다.
-# 이 경로가 깨지면 매일 밤 500 이 난다.
+# 이 경로가 깨지면 매일 밤 500 이 난다. 화면만 올리는 배포의 볼륨도 이 라운드에서 붙인다.
 echo "2라운드: 열차 0대 응답"
+printf '<!DOCTYPE html><title>smoke-static-override</title>\n' > "$STATIC_ROOT/index.html"
+export KENNYMETRO_STATIC_ROOT="$STATIC_ROOT"
 start_stub empty
 start_app
 
@@ -158,6 +167,12 @@ if [ "$(date '+%Y-%m-%d')" = "$DAY_BEFORE" ]; then
 else
   echo "  자정을 넘겨 이어받기 확인은 건너뛴다"
 fi
+
+# 볼륨의 화면이 이미지에 담긴 것보다 먼저 나와야 한다. 첫 화면(`/`)은 RootPageController 가
+# index.html 로 넘기는 경로라 따로 본다. 볼륨에 없는 파일은 이미지 것으로 떨어진다.
+curl -sf "$BASE/" | grep -q 'smoke-static-override' || fail "첫 화면이 볼륨의 파일이 아니다"
+curl -sf "$BASE/index.html" | grep -q 'smoke-static-override' || fail "index.html 이 볼륨의 파일이 아니다"
+curl -sf "$BASE/favicon.svg" -o /dev/null || fail "볼륨에 없는 favicon 이 이미지 것으로 떨어지지 않는다"
 echo "  통과"
 
 echo "스모크 테스트 통과"

@@ -87,13 +87,15 @@ set -e
 mkdir -p ~/.local/share/kennymetro
 podman pull ghcr.io/kennysoft/kennymetro:latest
 podman rm -f kennymetro
+# 화면만 올린 파일이 새 이미지에 담긴 화면을 가리지 않게 지운다 (아래 "화면만 고칠 때").
+rm -rf ~/.local/share/kennymetro/static
 podman run -d --name kennymetro --network=host --restart=always \
   --env-file ~/.config/kennymetro/env \
   -v ~/.local/share/kennymetro:/app/data:Z \
   ghcr.io/kennysoft/kennymetro:latest
 ```
 
-**볼륨은 호출 원장(`api-calls.log`) 하나를 위한 것이다.** 날짜별로 그 날 서울시 API 에 나간 호출 수가 한 줄씩 쌓인다. 안 붙여도 앱은 뜨지만 재생성할 때마다 0 부터 다시 세어, 화면의 남은 예산이 실제 한도와 어긋난다.
+**볼륨에는 호출 원장(`api-calls.log`)과 화면만 올릴 때 쓰는 `static` 디렉토리가 담긴다.** 호출 원장에는 날짜별로 그 날 서울시 API 에 나간 호출 수가 한 줄씩 쌓인다. 안 붙여도 앱은 뜨지만 재생성할 때마다 0 부터 다시 세어, 화면의 남은 예산이 실제 한도와 어긋난다. `static` 은 아래 "화면만 고칠 때" 에서 쓴다.
 
 **`sudo` 로 실행하지 않는다.** `~/.config/kennymetro/env` 가 `/root` 쪽으로 해석되어 인증키 파일을 못 찾고, rootless podman 에서는 컨테이너도 따로 뜬다. 셋업한 사용자 그대로 실행한다.
 
@@ -120,11 +122,27 @@ native 기동이 0.1초 수준이라 무중단 배포 장치는 필요 없다. P
 
 **4. 검증**은 `GET /actuator/health` 가 `UP` 인지로 한다.
 
+### 화면만 고칠 때 (빌드 없이)
+
+HTML 과 SVG 는 볼륨의 `static` 디렉토리에서 먼저 찾으므로 **native 재빌드도, 컨테이너 재생성도 필요 없다.** 로컬에서 파일만 올리면 새로 고침으로 반영된다.
+
+```sh
+./scripts/deploy-static.sh
+```
+
+CI 가 5분 가까이 걸리는 데 비해 이쪽은 몇 초다. ssh 호스트는 `ampere` 이고 첫 인자나 `KENNYMETRO_SSH_HOST` 로 바꾼다.
+
+- 앱은 `spring.web.resources.static-locations` 에서 **볼륨을 먼저, classpath 를 나중에** 본다. 볼륨에 없는 파일은 이미지에 담긴 것으로 동작하고, 로컬 실행도 같다.
+- **서버 코드와 함께 바뀐 화면은 이 방법만으로 부족하다.** 화면이 새 API 응답을 기대하면 이미지를 새로 받아야 한다.
+- **이미지를 새로 받을 때는 볼륨의 화면을 지운다.** 볼륨이 classpath 보다 우선이라, 남겨 두면 옛 파일이 새 이미지에 담긴 화면을 가린다. 위 재생성 스크립트가 컨테이너를 띄우기 전에 지운다. 그러므로 화면만 올린 변경도 push 해 두어야 다음 이미지에 들어간다.
+- `/` 는 컨트롤러가 `index.html` 로 넘긴다. welcome page 매핑에 맡기지 않아야 새로 올린 `index.html` 이 `/` 에도 바로 나온다. 스모크 테스트가 native 바이너리에서 확인한다.
+- 화면 응답에 `Cache-Control: no-cache` 를 붙여 브라우저가 매번 바뀌었는지 묻게 한다. 바뀌지 않았으면 304 로 끝난다.
+
 ### 스모크 테스트
 
 CI 가 native 바이너리를 실제로 띄워 열차 목록을 왕복한다. 실제 API 는 부르지 않고 `scripts/stub-seoul-api.py` 를 쓴다 - 하루 1,000회 예산을 CI 가 깎으면 안 되고, 외부 네트워크에 의존하게 된다.
 
-**열차가 0대인 응답까지 확인하는 것이 요점이다.** Kotlin 의 빈 컬렉션은 native 에서 직렬화가 깨지는데 JVM 테스트로는 잡히지 않고, 운행이 끝나면 매일 밤 그 상태가 된다.
+**열차가 0대인 응답까지 확인하는 것이 요점이다.** Kotlin 의 빈 컬렉션은 native 에서 직렬화가 깨지는데 JVM 테스트로는 잡히지 않고, 운행이 끝나면 매일 밤 그 상태가 된다. 두 번째 기동에는 화면 볼륨을 붙여, 볼륨의 `index.html` 이 `/` 와 `/index.html` 에 나오고 볼륨에 없는 파일은 이미지 것으로 떨어지는지도 본다.
 
 로컬에서 돌리려면 `BINARY` 로 바이너리 경로를 준다.
 
