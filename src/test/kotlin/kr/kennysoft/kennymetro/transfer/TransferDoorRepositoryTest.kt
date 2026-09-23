@@ -194,6 +194,14 @@ class TransferDoorRepositoryTest : FreeSpec({
         bulgwang.doors.map { it.side } shouldBe listOf(Direction.DOWN, Direction.DOWN)
     }
 
+    "열차가 다니지 않는 역 바로 옆의 방면 없는 줄은 열차가 들어오는 쪽에만 둔다" {
+        // given - GTX-A 는 삼성역이 열리지 않아 수서가 남쪽 구간의 끝이다. 열차는 성남 쪽에서만 들어온다.
+        val suseo = repository.findByLine(TestLines.bySlug("gtx-a")).stations.single { it.station == "수서" }
+
+        // when & then
+        suseo.doors.map { it.side } shouldBe listOf(Direction.UP)
+    }
+
     "방면 없는 줄이 중간역에 있으면 양쪽에 둔다" {
         // given - 8호선 구리는 어느 쪽으로 가든 같은 문이다.
         val guri = repository.findByLine(TestLines.bySlug("line8")).stations.single { it.station == "구리" }

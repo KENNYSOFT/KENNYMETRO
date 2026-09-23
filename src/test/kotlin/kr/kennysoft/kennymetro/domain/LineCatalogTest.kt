@@ -172,6 +172,30 @@ class LineCatalogTest : FreeSpec({
         error.message shouldContain "down-only"
     }
 
+    "열차가 다니지 않는 역이 노선에 없으면 기동이 실패한다" {
+        // given - 역명 오타로 조용히 빠지면 흐리게 세울 역이 멀쩡한 역처럼 보이고 옆 역의 환승 문이 양쪽에 나온다.
+        val broken = MetroProperties(
+            listOf(
+                LineConfig(
+                    slug = "test",
+                    name = "테스트선",
+                    color = "#000000",
+                    source = LineSource.SEOUL,
+                    upLabel = "위",
+                    downLabel = "아래",
+                    stations = listOf("가", "나"),
+                    noService = listOf("없는역"),
+                )
+            )
+        )
+
+        // when
+        val error = shouldThrow<IllegalStateException> { LineCatalog(broken) }
+
+        // then - 어느 설정이 틀렸는지 알려야 한다.
+        error.message shouldContain "no-service"
+    }
+
     "대괄호를 빠뜨려 키가 지워진 역명 치환은 기동이 실패한다" {
         // given - relaxed binding 이 한글 키를 지우면 빈 키가 된다. 조용히 넘어가면 그 역의 열차가 사라진다.
         val broken = MetroProperties(

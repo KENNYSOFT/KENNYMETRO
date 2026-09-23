@@ -68,6 +68,11 @@ data class LineConfig(
      */
     val downOnly: List<String> = emptyList(),
     /**
+     * 열차가 서지도 지나지도 않는 역. GTX-A 삼성역이 열리지 않아 서울역과 수서 사이로 열차가
+     * 다니지 않는다. 끊긴 두 구간을 한 줄로 세우려고 목록에 두고, 화면은 흐리게 세운다.
+     */
+    val noService: List<String> = emptyList(),
+    /**
      * 환승 문 파일 이름(`transfer/<이름>-doors.csv`). 적지 않으면 slug 다. 지선마다 뷰를 둔
      * 노선은 원본 문서가 하나라 파일도 하나를 나눠 쓴다.
      */

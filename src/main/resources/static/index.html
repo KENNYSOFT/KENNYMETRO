@@ -105,6 +105,8 @@
     background: var(--bg); padding: 2px 6px; border-radius: 4px;
   }
   .name .key { font-weight: 700; }
+  /* 열차가 서지도 지나지도 않는 역. 끊긴 두 구간을 한 줄로 세우려고 목록에 둔 자리다(GTX-A 삼성). */
+  .name .no-service { color: var(--muted); }
   .lane { display: flex; gap: 6px; flex-wrap: wrap; min-height: 24px; align-items: center; min-width: 0; }
   .lane.up { justify-content: flex-end; }
   .lane.down { justify-content: flex-start; }
@@ -283,15 +285,25 @@ function loadView() {
     if (!saved) return;
     // 예전에는 펼침 상태만 담았다. 칸을 늘리면서 그 값을 버리지 않는다.
     view = {
-      lines: Array.isArray(saved.lines) ? saved.lines : null,
-      open: Array.isArray(saved.open) ? saved.open : [],
-      full: Array.isArray(saved.full) ? saved.full : [],
+      lines: Array.isArray(saved.lines) ? renameViews(saved.lines) : null,
+      open: Array.isArray(saved.open) ? renameViews(saved.open) : [],
+      full: Array.isArray(saved.full) ? renameViews(saved.full) : [],
       focus: saved.focus && typeof saved.focus === 'object' ? saved.focus : {},
       key: saved.key && typeof saved.key === 'object' ? saved.key : {},
     };
   } catch (e) {
     // 사생활 보호 모드나 저장소 차단. 기본값으로 간다.
   }
+}
+
+/**
+ * 합쳐서 없어진 뷰와 그 뒤를 잇는 뷰. 이 브라우저에 저장된 선택을 옮겨, 합친 뒤에도 보던 노선이
+ * 목록에서 빠지지 않게 한다.
+ */
+const RENAMED_VIEWS = { 'gtx-a-north': 'gtx-a', 'gtx-a-south': 'gtx-a' };
+
+function renameViews(slugs) {
+  return [...new Set(slugs.map(slug => RENAMED_VIEWS[slug] || slug))];
 }
 
 function saveView() {
@@ -405,6 +417,10 @@ function buildRail(line) {
     const panelId = 'tr-' + line.slug + '-' + i;
     const node = info ? transferToggle(name, panelId) : el('span', null, name);
     if (keys.includes(name)) node.classList.add('key');
+    if (line.noService.includes(name)) {
+      node.classList.add('no-service');
+      node.title = '아직 열리지 않은 역입니다';
+    }
     label.appendChild(node);
     stop.appendChild(label);
 
@@ -415,19 +431,23 @@ function buildRail(line) {
   return rail;
 }
 
-/** 그 역에서 열차가 다니는 쪽. 6호선 순환 구간은 오른쪽으로만 다닌다. */
+/**
+ * 그 역에서 열차가 다니는 쪽. 6호선 순환 구간은 오른쪽으로만 다니고, 열리지 않은 GTX-A 삼성은
+ * 어느 쪽으로도 다니지 않는다.
+ */
 function lanesAt(line, name) {
+  if (line.noService.includes(name)) return 'none';
   return line.downOnly.includes(name) ? 'down' : 'both';
 }
 
 /**
- * 화살표를 깔 구간. 화살표는 구간 전체에 이어 깔리므로, 열차가 한쪽으로만 다니는 자리는 구간을
- * 따로 열어 다니지 않는 쪽의 화살표를 뺀다.
+ * 화살표를 깔 구간. 화살표는 구간 전체에 이어 깔리므로, 열차가 한쪽으로만 다니거나 다니지 않는
+ * 자리는 구간을 따로 열어 다니지 않는 쪽의 화살표를 뺀다.
  */
 function buildSegment(lanes) {
   const segment = el('div', 'segment');
   if (lanes === 'both') segment.appendChild(el('div', 'dir up'));
-  segment.appendChild(el('div', 'dir down'));
+  if (lanes !== 'none') segment.appendChild(el('div', 'dir down'));
   return segment;
 }
 

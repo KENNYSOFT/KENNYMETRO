@@ -74,6 +74,21 @@ class ServiceKindTest : FreeSpec({
         toGwangwoon?.service shouldBe ServiceKind.BRANCH
     }
 
+    "끊긴 구간의 끝에서 돌아가는 열차는 평소 운행이다" {
+        // given - GTX-A 는 삼성역이 열리지 않아 서울역과 수서에서 돌아간다. 한 줄로 세워도 단축이 아니다.
+        val line = TestLines.bySlug("gtx-a")
+
+        // when
+        val toSeoul = train(line, "연신내", "서울역")
+        val toSuseo = train(line, "성남", "수서")
+
+        // then
+        toSeoul?.direction shouldBe Direction.DOWN
+        toSeoul?.service shouldBe ServiceKind.NORMAL
+        toSuseo?.direction shouldBe Direction.UP
+        toSuseo?.service shouldBe ServiceKind.NORMAL
+    }
+
     "모르는 종착역으로 가는 열차는 그리지 않는다" {
         // given - 어느 뷰에도 없고 beyond 에도 없으면 방향을 정할 근거가 없다. 서버가 로그로 남긴다.
         val line = TestLines.bySlug("line3")

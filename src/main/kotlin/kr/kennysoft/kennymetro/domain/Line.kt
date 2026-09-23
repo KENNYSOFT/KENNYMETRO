@@ -66,6 +66,15 @@ data class Line(
      * 칸에만 둔다. 방면 없는 줄은 보통 양쪽에 두지만 이 역에는 왼쪽으로 가는 열차가 들어오지 않는다.
      */
     val downOnly: Set<String>,
+    /**
+     * 열차가 서지도 지나지도 않는 역.
+     *
+     * <p>
+     * GTX-A 삼성역이 열리지 않아 운정중앙에서 서울역까지와 수서에서 동탄까지가 따로 다닌다. 두
+     * 구간을 한 줄로 세우려고 목록에 두고 화면은 흐리게 세운다. 그 바로 옆 역(서울역, 수서)은 한쪽
+     * 구간의 끝이라 목록의 끝 역처럼 열차가 한쪽에서만 들어온다.
+     */
+    val noService: Set<String>,
     /** 환승 문 파일 이름(`transfer/<이름>-doors.csv`). 지선마다 뷰를 둔 노선은 한 파일을 나눠 쓴다. */
     val transferFile: String,
 ) {
@@ -77,6 +86,9 @@ data class Line(
 
     /** 역이 노선에서 몇 번째인지. 모르는 역이면 null. */
     fun indexOf(station: String): Int? = stations.indexOf(station).takeIf { it >= 0 }
+
+    /** 그 자리에 열차가 서는 역이 있는지. 목록 밖이거나 열차가 다니지 않는 역이면 false. */
+    fun servedAt(index: Int): Boolean = index in stations.indices && stations[index] !in noService
 
     /** 그 종착역으로 가는 열차가 이 뷰에서 어디를 향하고 어떤 운행인지. 모르는 종착역이면 null. */
     fun destinationOf(name: String): Destination? {

@@ -48,6 +48,7 @@ class LineController(
         budgeted = source == LineSource.SEOUL,
         extraDestinations = ArrayList(anchors.keys),
         downOnly = ArrayList(downOnly),
+        noService = ArrayList(noService),
     )
 }
 
@@ -84,4 +85,6 @@ data class LineView(
     val extraDestinations: List<String>,
     /** 열차가 down 쪽으로만 지나는 역. 화면은 그 역의 왼쪽 화살표를 그리지 않는다. */
     val downOnly: List<String>,
+    /** 열차가 서지도 지나지도 않는 역. 화면은 흐리게 세우고 화살표를 그리지 않는다. */
+    val noService: List<String>,
 )

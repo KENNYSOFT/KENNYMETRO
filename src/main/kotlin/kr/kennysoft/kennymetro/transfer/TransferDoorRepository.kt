@@ -23,7 +23,7 @@ import org.springframework.stereotype.Component
  * 데이터와 같은 파일에 있어야 한쪽만 고쳐지는 일이 없다. CC BY 조건이라 화면에서 뺄 수 없다.
  *
  * <p>
- * 지선마다 뷰를 둔 노선(1호선, 5호선, 경의중앙선, GTX-A)은 원본 문서가 하나라 파일도 하나를
+ * 지선마다 뷰를 둔 노선(1호선, 5호선, 경의중앙선)은 원본 문서가 하나라 파일도 하나를
  * 나눠 쓴다. 각 뷰는 자기 목록에 있는 역만 가져가고, 나눠 쓰는 뷰 어디에도 없는 역은 오타로
  * 보고 기동을 실패시킨다.
  *
@@ -133,18 +133,20 @@ class TransferDoorRepository(private val catalog: LineCatalog) {
      *
      * <p>
      * 방면이 비어 있으면 어느 쪽으로 가든 같은 문이라 양쪽에 둔다. 다만 열차가 한쪽으로만 들어오는
-     * 역은 그쪽에만 둔다. 목록의 첫 역에는 앞쪽으로 가는 열차만, 끝 역에는 뒤쪽으로 가는 열차만
-     * 들어온다(수인분당선 청량리와 인천). 6호선 순환 구간은 lines.yml 의 down-only 로 안다.
-     * 순환선은 끝이 없고 방면을 외선과 내선으로 적으므로 좌우 이름과 그대로 견준다.
+     * 역은 그쪽에만 둔다. 구간의 첫 역에는 앞쪽으로 가는 열차만, 끝 역에는 뒤쪽으로 가는 열차만
+     * 들어온다. 목록의 양 끝(수인분당선 청량리와 인천)이 그렇고, 열차가 다니지 않는 역 바로 옆의
+     * 역(GTX-A 수서)도 그렇다. 6호선 순환 구간은 lines.yml 의 down-only 로 안다. 순환선은 끝이
+     * 없고 방면을 외선과 내선으로 적으므로 좌우 이름과 그대로 견준다.
      */
     private fun sideOf(trainDirection: String?, station: String, line: Line, where: String): Direction? {
         if (trainDirection == null) {
+            val index = line.indexOf(station)!!
             return when {
                 line.circular -> null
                 // 6호선 역촌은 목록의 첫 역이지만 순환 구간이라 열차가 오른쪽으로만 지난다.
                 station in line.downOnly -> Direction.DOWN
-                station == line.stations.first() -> Direction.UP
-                station == line.stations.last() -> Direction.DOWN
+                !line.servedAt(index - 1) -> Direction.UP
+                !line.servedAt(index + 1) -> Direction.DOWN
                 else -> null
             }
         }
