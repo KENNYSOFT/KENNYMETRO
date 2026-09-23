@@ -159,7 +159,9 @@
   .pick, .set { font-size: 12px; margin-top: 8px; }
   .pick { border: 1px solid var(--edge); border-radius: 8px; padding: 10px 12px; }
   .pick-note, .set-note { color: var(--muted); margin: 0 0 8px; }
-  .pick-list { display: flex; flex-direction: column; gap: 4px; }
+  /* 목록 폭을 가장 긴 노선 이름에 맞춘다. 넓은 화면에서 폭을 다 차지하면 버튼이 오른쪽 끝으로 밀려
+     어느 노선의 버튼인지 알아보기 어렵다. 버튼은 이름 옆에 한 열로 선다. */
+  .pick-list { display: flex; flex-direction: column; gap: 4px; width: max-content; max-width: 100%; }
   .pick-row { display: flex; align-items: center; gap: 6px; }
   .pick-row .dot { width: 9px; height: 9px; }
   .pick-name { flex: 1; }
