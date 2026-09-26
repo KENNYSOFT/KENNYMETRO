@@ -102,10 +102,12 @@ class LineCatalogTest : FreeSpec({
         val catalog = TestLines.catalog
 
         // when & then
-        catalog.viewsNamed("1호선").map { it.slug } shouldBe listOf("line1-gyeongin", "line1-gyeongbu")
+        catalog.viewsNamed("1호선").map { it.slug } shouldBe listOf("line1-gyeongin", "line1-gyeongbu", "line1-gwangmyeong")
+        catalog.viewsNamed("1호선 광명셔틀").map { it.slug } shouldBe listOf("line1-gwangmyeong")
         catalog.viewsNamed("2호선 신정지선").map { it.slug } shouldBe listOf("line2-sinjeong")
         catalog.viewsNamed("5호선 (방화 방면)").map { it.slug } shouldBe listOf("line5-hanam", "line5-macheon")
-        catalog.viewsNamed("인천1호선").shouldBeEmpty()
+        catalog.viewsNamed("인천1호선").map { it.slug } shouldBe listOf("incheon1")
+        catalog.viewsNamed("김포 골드라인").shouldBeEmpty()
     }
 
     "노선마다 이름이 다른 환승역을 같은 역으로 본다" {

@@ -9,6 +9,12 @@ package kr.kennysoft.kennymetro.domain
 enum class LineSource {
     SEOUL,
     EVERLINE,
+
+    /**
+     * 실시간 위치를 받을 곳이 없다. 역과 환승 문만 보이고 화면은 열차 자리에 추후 지원 예정이라고
+     * 적는다. 인천1호선과 인천2호선은 서울시 API 에 없고 인천교통공사도 실시간 위치를 내지 않는다.
+     */
+    NONE,
 }
 
 /**
@@ -70,7 +76,7 @@ data class Line(
      * 1호선 경인 뷰에서 신창행은 구로까지 같은 선로를 달린다. 그 열차를 버리면 종각에서
      * 영등포로 가려는 사람이 탈 수 있는 열차의 절반을 못 본다. 그래서 갈라지는 역을 종착처럼
      * 두고 방향을 정한다. 형제 뷰(같은 API 노선)의 역에서 저절로 계산되고, 어느 뷰에도 없는
-     * 종착역(서동탄, 광명)은 lines.yml 의 beyond 로 적는다.
+     * 종착역(서동탄)은 lines.yml 의 beyond 로 적는다.
      */
     val anchors: Map<String, Destination>,
     /**

@@ -1074,6 +1074,11 @@ async function refresh(line) {
   const section = document.querySelector('.line[data-slug="' + line.slug + '"]');
   if (!section || !isOpen(line.slug)) return;
   const status = section.querySelector('.line-status');
+  // 인천1호선과 인천2호선은 실시간 위치를 받을 곳이 없다. 역과 환승 문만 보여 준다.
+  if (!line.live) {
+    status.textContent = '실시간 위치는 추후 지원 예정';
+    return;
+  }
   try {
     const res = await fetch('/api/lines/' + line.slug + '/trains', { cache: 'no-store' });
     if (!res.ok) throw new Error('HTTP ' + res.status);

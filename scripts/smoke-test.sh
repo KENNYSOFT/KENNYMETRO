@@ -105,6 +105,9 @@ echo "$LINE3" | grep -q '"trainNo":"3423","currentStation":"동대입구","desti
 UISINSEOL=$(curl -sf "$BASE/api/lines/uisinseol/trains") || fail "우이신설선 열차 목록을 받지 못했다"
 echo "$UISINSEOL" | grep -q '"trainNo":"1147","currentStation":"가오리","destination":null,"direction":"UP"' \
   || fail "시간표가 없는 노선에서 종착역을 비우고 updnLine 으로 방향을 정하지 못했다: $UISINSEOL"
+# 실시간 위치를 받을 곳이 없는 노선. 불려도 아무 데도 호출하지 않고 빈 목록을 준다. 아래 호출 수가 이것을 함께 본다.
+INCHEON=$(curl -sf "$BASE/api/lines/incheon1/trains") || fail "인천1호선 열차 목록을 받지 못했다"
+echo "$INCHEON" | grep -q '"trains":\[\]' || fail "실시간 위치가 없는 노선이 빈 목록이 아니다: $INCHEON"
 
 # 환승 데이터는 classpath 리소스라 native image 에 자동으로 실리지 않는다. 힌트를 빠뜨리면
 # JVM 에서는 멀쩡히 읽히고 바이너리에서만 파일이 없는 것처럼 빈 목록이 된다.
@@ -130,16 +133,18 @@ echo "$GYEONGBU" | grep -q '"station":"수원"' || fail "나눠 쓰는 환승 �
 # 노선 목록. lines.yml 이 native image 에 실리지 않으면 여기가 빈다.
 LINES=$(curl -sf "$BASE/api/lines") || fail "노선 목록을 받지 못했다"
 echo "$LINES" | grep -q '"lines":\[\]' && fail "노선이 비었다. lines.yml 이 native image 에 실리지 않았다"
-for slug in shinbundang line2 line9 suinbundang everline; do
+for slug in shinbundang line2 line9 suinbundang everline incheon1 line1-gwangmyeong; do
   echo "$LINES" | grep -q "\"slug\":\"$slug\"" || fail "$slug 노선이 목록에 없다: $LINES"
 done
+# 화면은 이 값으로 열차를 부를지 정한다. 빠지면 인천 노선이 열차 0대로만 보인다.
+echo "$LINES" | grep -q '"slug":"incheon1"[^}]*"live":false' || fail "실시간 위치가 없는 노선이 표시되지 않았다: $LINES"
 # 편성 차수는 신분당선에만 있다. 이 값이 빠지면 화면에서 색 구분이 통째로 사라진다.
 echo "$LINES" | grep -q '"generations":\[' || fail "편성 차수가 응답에 없다: $LINES"
 # 프리셋이 없으면 처음 방문한 화면이 통째로 빈다.
 echo "$LINES" | grep -q '"preset":\["shinbundang"' || fail "프리셋이 응답에 없다: $LINES"
-# 1호선은 계통마다 뷰를 나누되 API 노선명은 하나다. 이 값이 어긋나면 호출이 배로 나간다.
-[ "$(echo "$LINES" | grep -o '"apiName":"1호선"' | wc -l)" -eq 2 ] \
-  || fail "1호선 뷰 둘이 같은 API 노선을 가리키지 않는다: $LINES"
+# 1호선은 계통마다 뷰를 나누되(경인, 경부, 광명셔틀) API 노선명은 하나다. 이 값이 어긋나면 호출이 배로 나간다.
+[ "$(echo "$LINES" | grep -o '"apiName":"1호선"' | wc -l)" -eq 3 ] \
+  || fail "1호선 뷰 셋이 같은 API 노선을 가리키지 않는다: $LINES"
 
 # 호출 원장. 위 trains 요청으로 서울시 API 를 여섯 번 불렀으니 그것이 파일에 남아야 한다. 실시간
 # 위치가 세 노선에 한 번씩, 3423 을 다시 보느라 역 코드 한 번과 평일 시간표 상하행 두 번이다.

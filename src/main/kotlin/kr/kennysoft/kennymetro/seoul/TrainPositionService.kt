@@ -121,6 +121,9 @@ class TrainPositionService(
             val raw = everlineClient.findPositions()
             Positions(raw.size) { view -> raw.mapNotNull { it.toTrain(view) } }
         }
+
+        // 받을 곳이 없다. 화면은 이런 노선을 부르지 않지만, 불려도 아무 데도 호출하지 않는다.
+        LineSource.NONE -> Positions(0) { emptyList() }
     }
 
     /**

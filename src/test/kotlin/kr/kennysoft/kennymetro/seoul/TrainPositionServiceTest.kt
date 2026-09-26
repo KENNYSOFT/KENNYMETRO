@@ -133,6 +133,19 @@ class TrainPositionServiceTest : FreeSpec({
         timetables.calls.shouldBeEmpty()
     }
 
+    "실시간 위치를 받을 곳이 없는 노선은 아무 데도 부르지 않고 빈 목록을 준다" {
+        // given - 인천1호선은 서울시 API 에 없고 인천교통공사도 실시간 위치를 내지 않는다.
+        val service = service()
+
+        // when
+        val snapshot = service.snapshot(TestLines.bySlug("incheon1"))
+
+        // then - 예산을 깎지 않는다.
+        snapshot.trains.shouldBeEmpty()
+        seoul.calls shouldBe 0
+        service.apiCallCount() shouldBe 0
+    }
+
     "시간표 호출도 같은 인증키로 나가므로 원장에 센다" {
         // given
         seoul.next = listOf(position("3423", "동대입구", "구파발", updnLine = "1", receivedAt = "2026-09-24 00:59:24"))

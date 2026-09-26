@@ -172,7 +172,7 @@ class TransferDoorRepository(private val catalog: LineCatalog) {
      * 이 뷰의 목록에 없는 역은 같은 API 노선의 다른 뷰에서 찾아, 두 역을 함께 담은 뷰에서 자리를
      * 견준다. 그 뷰들은 앞쪽 끝을 같이 쓰므로(1호선은 연천, 5호선은 방화) 어느 뷰에서 견주든 쪽이
      * 같다. 5호선 마천 뷰의 강동에서 하남검단산행이 그렇게 풀린다 - 이 뷰에서는 하남검단산이 바로
-     * 강동에서 갈라져 자리가 같다. 어느 뷰에도 없는 종착역(1호선 광명)은 갈라지는 역의 자리로 본다.
+     * 강동에서 갈라져 자리가 같다. 어느 뷰에도 없는 종착역(1호선 서동탄)은 갈라지는 역의 자리로 본다.
      */
     private fun towards(name: String, station: String, line: Line): Direction? {
         val views = listOf(line) + catalog.all().filter { it !== line && it.cacheKey == line.cacheKey }

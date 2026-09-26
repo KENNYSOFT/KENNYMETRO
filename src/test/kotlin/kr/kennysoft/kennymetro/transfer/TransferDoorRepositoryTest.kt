@@ -137,7 +137,7 @@ class TransferDoorRepositoryTest : FreeSpec({
     }
 
     "급행이나 셔틀이 붙은 방면도 거기 적힌 역으로 칸을 가린다" {
-        // given - 1호선 신도림. 광명은 어느 뷰의 목록에도 없어 금천구청에서 갈라진다는 것으로 자리를 안다.
+        // given - 1호선 신도림. 광명은 경부 뷰에 없고 광명셔틀 뷰에 신도림과 함께 있어 그 뷰에서 자리를 안다.
         val sindorim = repository.findByLine(TestLines.bySlug("line1-gyeongbu")).stations.single { it.station == "신도림" }
 
         // when
@@ -223,6 +223,10 @@ class TransferDoorRepositoryTest : FreeSpec({
         nextOf("line5-hanam", "까치산") shouldBe setOf("2호선 신정지선" to "신도림" to "신정네거리")
         // 1호선은 계통마다 뷰가 있어도 종로3가에서는 두 뷰 모두 종각으로 간다.
         nextOf("line3", "종로3가") shouldContainAll setOf("1호선" to "인천/신창/서동탄" to "종각")
+        // 실시간 위치가 없는 노선도 역 목록이 있으면 풀린다. 7호선 부평구청에서 인천1호선으로 갈아탄다.
+        nextOf("line7", "부평구청") shouldContainAll setOf("인천1호선" to "계양" to "갈산", "인천1호선" to "송도달빛축제공원" to "부평시장")
+        // 광명셔틀은 그 뷰의 이름으로 찾는다. 금천구청에서 광명 방면은 바로 광명이다.
+        nextOf("line1-gyeongbu", "금천구청") shouldContainAll setOf("1호선 광명셔틀" to "광명" to "광명")
     }
 
     "갈라지는 역에서는 방면이 가리키는 지선의 다음 역을 쓰고 두 지선이면 비운다" {
@@ -237,13 +241,14 @@ class TransferDoorRepositoryTest : FreeSpec({
         next shouldContainAll setOf("마천" to "둔촌동", "하남검단산/마천" to null)
     }
 
-    "우리가 담지 않은 노선이나 방면이 없는 줄에는 다음 역이 없다" {
-        // given - 인천1호선은 역 목록이 없다. 방면이 없는 줄은 어느 쪽으로 가든 같은 문이다.
-        val bupyeongGu = repository.findByLine(TestLines.bySlug("line7")).stations.single { it.station == "부평구청" }
+    "여러 노선을 한 줄에 적었거나 방면이 없는 줄에는 다음 역이 없다" {
+        // given - 9호선 김포공항의 "5호선/공항철도 서울역 방면" 은 서울역이 공항철도에만 있다. 방면이 없는
+        // 줄은 어느 쪽으로 가든 같은 문이다.
+        val gimpo = repository.findByLine(TestLines.bySlug("line9")).stations.single { it.station == "김포공항" }
         val guri = repository.findByLine(TestLines.bySlug("line8")).stations.single { it.station == "구리" }
 
         // when & then
-        bupyeongGu.doors.filter { it.targetLine == "인천1호선" }.forAll { it.targetNext.shouldBeNull() }
+        gimpo.doors.filter { it.targetLine == "5호선/공항철도" }.forAll { it.targetNext.shouldBeNull() }
         guri.doors.forAll { it.targetNext.shouldBeNull() }
     }
 

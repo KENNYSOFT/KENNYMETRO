@@ -46,6 +46,7 @@ class LineController(
         fleet = fleet,
         // 용인경전철은 다른 엔드포인트라 하루 1,000회 예산에 들지 않는다.
         budgeted = source == LineSource.SEOUL,
+        live = source != LineSource.NONE,
         extraDestinations = ArrayList(anchors.keys),
         downOnly = ArrayList(downOnly),
         noService = ArrayList(noService),
@@ -78,6 +79,8 @@ data class LineView(
     val keyStations: List<String>,
     val fleet: Fleet?,
     val budgeted: Boolean,
+    /** 실시간 위치를 받는 노선인지. 아니면 화면이 열차를 부르지 않고 추후 지원 예정이라고 적는다. */
+    val live: Boolean,
     /**
      * 역 목록에는 없지만 이 뷰가 알아듣는 종착역. 다른 계통으로 갈라지거나 목록 밖으로 더 가는
      * 열차의 종착이다. `scripts/probe-coverage.sh` 가 역명을 대조할 때 오탐을 막는 데 쓴다.
