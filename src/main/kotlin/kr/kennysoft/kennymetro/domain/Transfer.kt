@@ -16,6 +16,11 @@ package kr.kennysoft.kennymetro.domain
  * (시종착역, 6호선 순환 구간)이면 그쪽이다.
  *
  * <p>
+ * `targetNext` 는 갈아탄 뒤 `targetDirection` 으로 가면 바로 다음에 서는 역이다. 방면을 종착역으로
+ * 적어 두면 그 노선을 자주 타지 않는 사람은 어느 쪽인지 떠올리기 어려워 함께 보인다. 방면이
+ * 없거나, 우리가 담지 않은 노선이거나, 가릴 수 없으면 null 이다(`TransferDoorRepository`).
+ *
+ * <p>
  * 자리는 세 가지다. `car` 와 `door` 만 있으면 그 문 하나이고, `toCar` 와 `toDoor` 까지 있으면
  * 앞 자리부터 그 자리까지 이어진 모든 문이다. 넷 다 null 이면 어느 문에서 내려도 된다. 뒤의
  * 둘은 같은 승강장 건너편에서 갈아타는 역에서 나온다(4호선 한대앞에서 수인분당선이 그렇다).
@@ -25,6 +30,7 @@ data class TransferDoor(
     val side: Direction?,
     val targetLine: String,
     val targetDirection: String?,
+    val targetNext: String?,
     val car: Int?,
     val door: Int?,
     val toCar: Int?,

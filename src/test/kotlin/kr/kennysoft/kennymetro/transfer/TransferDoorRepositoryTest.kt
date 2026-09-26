@@ -210,6 +210,43 @@ class TransferDoorRepositoryTest : FreeSpec({
         guri.doors.map { it.side } shouldBe listOf(null, null)
     }
 
+    "갈아탈 노선의 방면으로 가면 바로 다음에 서는 역을 함께 돌려준다" {
+        // given - 종착역으로 적은 방면은 그 노선을 자주 타지 않는 사람에게 어느 쪽인지 잘 떠오르지 않는다.
+        fun nextOf(slug: String, station: String) = repository.findByLine(TestLines.bySlug(slug)).stations
+            .single { it.station == station }.doors.map { it.targetLine to it.targetDirection to it.targetNext }.toSet()
+
+        // when & then - 신분당선 신사에서 3호선으로 갈아탄다.
+        nextOf("shinbundang", "신사") shouldBe setOf("3호선" to "대화" to "압구정", "3호선" to "오금" to "잠원")
+        // 순환선은 외선과 내선으로 가린다. 3호선 교대에서 2호선 내선은 서초, 외선은 강남으로 간다.
+        nextOf("line3", "교대") shouldContainAll setOf("2호선" to "내선" to "서초", "2호선" to "외선" to "강남")
+        // 지선은 그 지선의 뷰에서 가린다. 5호선 까치산에서 신정지선 신도림 방면은 신정네거리로 간다.
+        nextOf("line5-hanam", "까치산") shouldBe setOf("2호선 신정지선" to "신도림" to "신정네거리")
+        // 1호선은 계통마다 뷰가 있어도 종로3가에서는 두 뷰 모두 종각으로 간다.
+        nextOf("line3", "종로3가") shouldContainAll setOf("1호선" to "인천/신창/서동탄" to "종각")
+    }
+
+    "갈라지는 역에서는 방면이 가리키는 지선의 다음 역을 쓰고 두 지선이면 비운다" {
+        // given - 5호선 강동에서 하남과 마천으로 갈린다. 마천 방면은 둔촌동이지만, 두 지선을 함께 적은
+        // 방면은 타는 열차에 따라 길동이기도 둔촌동이기도 하다.
+        val gangdong = repository.findByLine(TestLines.bySlug("line5-hanam")).stations.single { it.station == "강동" }
+
+        // when
+        val next = gangdong.doors.map { it.targetDirection to it.targetNext }.toSet()
+
+        // then
+        next shouldContainAll setOf("마천" to "둔촌동", "하남검단산/마천" to null)
+    }
+
+    "우리가 담지 않은 노선이나 방면이 없는 줄에는 다음 역이 없다" {
+        // given - 인천1호선은 역 목록이 없다. 방면이 없는 줄은 어느 쪽으로 가든 같은 문이다.
+        val bupyeongGu = repository.findByLine(TestLines.bySlug("line7")).stations.single { it.station == "부평구청" }
+        val guri = repository.findByLine(TestLines.bySlug("line8")).stations.single { it.station == "구리" }
+
+        // when & then
+        bupyeongGu.doors.filter { it.targetLine == "인천1호선" }.forAll { it.targetNext.shouldBeNull() }
+        guri.doors.forAll { it.targetNext.shouldBeNull() }
+    }
+
     "열차 방면으로 칸을 가릴 수 없으면 기동이 실패한다" {
         // given - 방면에 노선의 역이 하나도 없다. 조용히 양쪽에 두면 틀린 칸이 화면에 남는다.
         val catalog = LineCatalog(

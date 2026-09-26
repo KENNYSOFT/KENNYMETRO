@@ -108,11 +108,13 @@ class TransferDoorRepository(private val catalog: LineCatalog) {
             val spot = spot(columns[4], columns[5], where)
             if (line.indexOf(station) == null) return@forEach
             val trainDirection = columns[1].ifBlank { null }
+            val targetDirection = columns[3].ifBlank { null }
             result.getOrPut(station) { mutableListOf() } += TransferDoor(
                 trainDirection = trainDirection,
                 side = sideOf(trainDirection, station, line, where),
                 targetLine = columns[2],
-                targetDirection = columns[3].ifBlank { null },
+                targetDirection = targetDirection,
+                targetNext = targetNextOf(columns[2], targetDirection, station),
                 car = spot.car,
                 door = spot.door,
                 toCar = spot.toCar,
@@ -181,6 +183,44 @@ class TransferDoorRepository(private val catalog: LineCatalog) {
         }
         val anchor = line.anchors[name] ?: return null
         return directionBetween(line.indexOf(station)!!, anchor.index)
+    }
+
+    /**
+     * 갈아탄 뒤 그 방면으로 가면 바로 다음에 서는 역.
+     *
+     * <p>
+     * 갈아탈 노선의 뷰마다 방면에 적힌 역 가운데 그 뷰에 있는 역으로 쪽을 가리고, 순환선은 외선과
+     * 내선을 좌우 이름과 견준다. 열차 방면과 달리 형제 뷰의 역으로 가리지 않는다 - 갈라지는 역에서
+     * 다른 계통의 다음 역이 나온다(5호선 강동의 마천 방면을 하남 뷰에서 풀면 길동이 된다). 뷰마다
+     * 구해 하나로 모일 때만 쓴다. 1호선 종로3가의 "인천/신창/서동탄" 은 두 뷰 모두 종각이지만,
+     * 강동의 "하남검단산/마천" 은 지선마다 다음 역이 달라 하나로 말할 수 없다. 우리가 담지 않은
+     * 노선(인천1호선)과 여러 노선을 한 줄에 적은 줄은 풀지 않는다.
+     */
+    private fun targetNextOf(targetLine: String, targetDirection: String?, station: String): String? {
+        if (targetDirection == null || '/' in targetLine) return null
+        val names = catalog.sameStations(station)
+        return catalog.viewsNamed(targetLine.trim()).mapNotNull { view ->
+            val here = names.firstNotNullOfOrNull { view.indexOf(it) } ?: return@mapNotNull null
+            val side = if (view.circular) {
+                when (targetDirection) {
+                    view.upLabel -> Direction.UP
+                    view.downLabel -> Direction.DOWN
+                    else -> null
+                }
+            } else {
+                targetDirection.split('/', ' ')
+                    .mapNotNull { name -> view.indexOf(name)?.let { directionBetween(here, it) } }
+                    .toSet().singleOrNull()
+            }
+            side?.let { view.stationAfter(here, it) }
+        }.toSet().singleOrNull()
+    }
+
+    /** 그 쪽으로 한 역 가면 서는 역. 순환선은 이어 돌고, 목록 끝이나 열차가 다니지 않는 역이면 null. */
+    private fun Line.stationAfter(index: Int, side: Direction): String? {
+        val next = if (side == Direction.UP) index - 1 else index + 1
+        if (circular) return stations[Math.floorMod(next, stations.size)]
+        return if (servedAt(next)) stations[next] else null
     }
 
     /** 목록의 from 번째 역에서 to 번째 역으로 가는 쪽. 같은 역이면 null. */

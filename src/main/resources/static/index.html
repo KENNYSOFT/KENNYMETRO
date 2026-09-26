@@ -178,12 +178,15 @@
   .set-keys { display: flex; gap: 6px; flex-wrap: wrap; }
   .set-keys button[aria-pressed="true"] { font-weight: 700; outline: 2px solid var(--fg); outline-offset: -2px; }
 
-  /* 환승역만 눌러서 펼칠 수 있다. 점선 밑줄이 그 표시다. */
-  .name button {
-    border: 0; font: inherit; color: inherit; cursor: pointer;
-    border-bottom: 1px dashed var(--muted);
-  }
+  /* 환승역만 눌러서 펼칠 수 있다. 이름의 점선 밑줄이 그 표시다. */
+  .name button { border: 0; font: inherit; color: inherit; cursor: pointer; }
   .name button[aria-expanded="true"] { background: var(--card); }
+  /* 버튼 안의 조각은 이름 칸의 배경과 여백을 받지 않는다. 레일 선은 버튼이 이미 덮는다. */
+  .name button span { padding: 0; background: none; border-radius: 0; }
+  .name .tr-label { border-bottom: 1px dashed var(--muted); }
+  /* 갈아탈 수 있는 노선의 색. 패널을 열지 않아도 어느 노선으로 갈아타는지 보인다. */
+  .name .tr-dots { display: inline-flex; gap: 2px; margin-left: 4px; vertical-align: 1px; }
+  .name .tr-dot { width: 7px; height: 7px; border-radius: 50%; }
 
   /* 환승 문 위치는 역 이름 양옆 칸에 나눠 둔다. 칸이 곧 타고 온 열차의 방면이라 열차 칩이 서는
      칸과 같은 격자를 쓴다. 가운데를 비워 레일 세로선이 이어져 보이게 한다. */
@@ -220,6 +223,8 @@
     display: inline-block; width: 8px; height: 8px; border-radius: 50%;
     margin-right: 4px;
   }
+  /* 갈아탄 뒤 그 방면으로 가면 바로 다음에 서는 역. 종착역보다 먼저 알아보는 사람이 있다. */
+  .tr-next { color: var(--muted); }
   .tr-door { font-weight: 600; }
   /* 자리 하나는 줄을 바꾸지 않는다. 브라우저가 2-4 를 붙임표 뒤에서 끊는다. 자리 사이에서는 바꿀 수 있다. */
   .tr-spot { white-space: nowrap; }
@@ -382,11 +387,14 @@ function rangeOf(line) {
  * 넓어 여유를 둔다. 아주 긴 이름(동대문역사문화공원)도 한 줄에 들어가되 양옆 칸이 너무
  * 좁아지지 않게 상한을 둔다.
  */
-function nameWidth(names) {
+function nameWidth(names, dotCount) {
   let widest = 0;
   for (const name of names) {
     let w = 0;
     for (const ch of name) w += /[가-힣]/.test(ch) ? 1 : 0.62;
+    // 환승 노선 동그라미는 하나가 글자 0.65개쯤이고 이름과의 틈이 따로 있다.
+    const dots = dotCount(name);
+    if (dots > 0) w += 0.15 + dots * 0.65;
     widest = Math.max(widest, w);
   }
   const em = Math.min(Math.max(widest * 1.06, 4), 10);
@@ -398,7 +406,11 @@ function buildRail(line) {
   const range = rangeOf(line);
   const transfers = transfersByLine[line.slug];
   const keys = keysOf(line);
-  rail.style.setProperty('--name-w', nameWidth(line.stations.slice(range.from, range.to + 1)));
+  const dotsAt = name => {
+    const info = transfers && transfers.byStation.get(name);
+    return info ? transferDots(line, info) : [];
+  };
+  rail.style.setProperty('--name-w', nameWidth(line.stations.slice(range.from, range.to + 1), name => dotsAt(name).length));
   let segment = null;
   let lanes = null;
   for (let i = range.from; i <= range.to; i++) {
@@ -417,7 +429,7 @@ function buildRail(line) {
     const label = el('div', 'name');
     const info = transfers && transfers.byStation.get(name);
     const panelId = 'tr-' + line.slug + '-' + i;
-    const node = info ? transferToggle(name, panelId) : el('span', null, name);
+    const node = info ? transferToggle(name, panelId, dotsAt(name)) : el('span', null, name);
     if (keys.includes(name)) node.classList.add('key');
     if (line.noService.includes(name)) {
       node.classList.add('no-service');
@@ -520,9 +532,22 @@ function renderKinds(section, trains) {
 
 /* ---------- 환승 ---------- */
 
-function transferToggle(name, panelId) {
-  const btn = el('button', null, name);
+/** 환승역 이름. 갈아탈 노선의 색을 이름 옆에 세워 패널을 열지 않아도 어느 노선인지 보이게 한다. */
+function transferToggle(name, panelId, dots) {
+  const btn = el('button');
   btn.type = 'button';
+  btn.appendChild(el('span', 'tr-label', name));
+  if (dots.length > 0) {
+    const box = el('span', 'tr-dots');
+    for (const key of dots) {
+      const dot = el('span', 'tr-dot');
+      dot.style.background = transferColors[key];
+      box.appendChild(dot);
+    }
+    btn.appendChild(box);
+    btn.title = dots.join(', ') + ' 환승';
+    btn.setAttribute('aria-label', name + ', ' + dots.join(', ') + ' 환승');
+  }
   btn.setAttribute('aria-expanded', 'false');
   btn.setAttribute('aria-controls', panelId);
   btn.addEventListener('click', () => {
@@ -613,7 +638,11 @@ function buildTargetCell(targets) {
       item.appendChild(document.createTextNode(name.trim()));
       cell.appendChild(item);
     });
-    if (target.direction) cell.appendChild(document.createTextNode(' ' + directionName(target.direction)));
+    if (target.direction) {
+      cell.appendChild(document.createTextNode(' ' + directionName(target.direction)));
+      // 괄호로 감싸면 도는 쪽을 괄호로 적는 순환선 방면(내선순환(시계 방향))과 겹친다.
+      if (target.next) cell.appendChild(el('span', 'tr-next', ', 다음 역 ' + target.next));
+    }
   });
   return cell;
 }
@@ -629,20 +658,37 @@ function buildDoorCell(spots) {
 }
 
 /**
- * 노선 색 동그라미. 정확히 일치하는 이름을 먼저 찾고, 없으면 그 이름으로 시작하는 키를
- * 쓴다 - "2호선 신정지선" 과 "5호선 (방화 방면)" 이 본선 색을 받게 하려는 것이다.
+ * 노선 이름이 가리키는 노선 색표의 키. 정확히 일치하는 이름을 먼저 찾고, 없으면 그 이름으로
+ * 시작하는 키를 쓴다 - "2호선 신정지선" 과 "5호선 (방화 방면)" 이 본선 색을 받게 하려는 것이다.
  */
-function lineDot(name) {
+function colorKeyOf(name) {
   const target = name.trim();
-  let color = transferColors[target];
-  if (!color) {
-    const key = Object.keys(transferColors).find(k => target.startsWith(k));
-    if (key) color = transferColors[key];
-  }
-  if (!color) return null;
+  if (transferColors[target]) return target;
+  return Object.keys(transferColors).find(k => target.startsWith(k)) || null;
+}
+
+/** 노선 색 동그라미. 색을 모르는 노선이면 null. */
+function lineDot(name) {
+  const key = colorKeyOf(name);
+  if (!key) return null;
   const dot = el('span', 'line-dot');
-  dot.style.background = color;
+  dot.style.background = transferColors[key];
   return dot;
+}
+
+/**
+ * 그 역에서 갈아탈 수 있는 노선의 색표 키. 지금 노선과 같은 노선(2호선의 지선처럼 색이 같은 것)은
+ * 뺀다. 색표에 적힌 순서로 세워 역마다 같은 노선이 같은 자리에 오게 한다.
+ */
+function transferDots(line, info) {
+  const keys = new Set();
+  for (const d of info.doors) {
+    for (const name of d.targetLine.split('/')) {
+      const key = colorKeyOf(name);
+      if (key && key !== line.apiName && transferColors[key] !== line.color) keys.add(key);
+    }
+  }
+  return Object.keys(transferColors).filter(k => keys.has(k));
 }
 
 /**
@@ -655,7 +701,7 @@ function mergeDoors(doors) {
     const key = JSON.stringify([d.targetLine, d.targetDirection]);
     let g = byTarget.get(key);
     if (!g) {
-      g = { target: { line: d.targetLine, direction: d.targetDirection }, spots: [] };
+      g = { target: { line: d.targetLine, direction: d.targetDirection, next: d.targetNext }, spots: [] };
       byTarget.set(key, g);
     }
     g.spots.push(spotLabel(d));
@@ -738,7 +784,7 @@ function buildLegend(line) {
     ? '↑ 왼쪽은 ' + directionName(line.upLabel) + ', ↓ 오른쪽은 ' + directionName(line.downLabel) + ' 열차입니다. '
     : '↑ 왼쪽은 ' + line.upLabel + ' 방면, ↓ 오른쪽은 ' + line.downLabel + ' 방면입니다. '));
   if (transfersByLine[line.slug]) {
-    p.appendChild(document.createTextNode('밑줄 친 역 이름을 누르면 환승 문 위치가 타고 온 열차 쪽에 열립니다.'));
+    p.appendChild(document.createTextNode('밑줄 친 역에서 옆의 동그라미 색 노선으로 갈아탈 수 있습니다. 누르면 환승 문 위치가 타고 온 열차 쪽에 열립니다.'));
   }
   return p;
 }
