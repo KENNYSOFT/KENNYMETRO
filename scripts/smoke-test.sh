@@ -92,6 +92,8 @@ start_app
 
 BODY=$(curl -sf "$BASE/api/lines/shinbundang/trains") || fail "열차 목록을 받지 못했다"
 echo "$BODY" | grep -q '"trainNo":"11"' || fail "11번 열차가 응답에 없다: $BODY"
+# 진입, 도착, 출발. 화면이 역과 역 사이에 그리는 근거라 빠지면 모든 열차가 역에 선 것으로 보인다.
+echo "$BODY" | grep -q '"trainNo":"11"[^}]*"status":"DEPARTED"' || fail "11번 열차의 출발 상태가 응답에 없다: $BODY"
 echo "$BODY" | grep -q '"trainNo":"13"' && fail "종착 처리 중인 13번이 응답에 들어갔다: $BODY"
 echo "$BODY" | grep -q '"trainNo":"12","currentStation":"광교","destination":"신사","direction":"UP"' \
   || fail "회차 대기 열차의 방향이 UP 이 아니다: $BODY"
@@ -145,6 +147,14 @@ echo "$LINES" | grep -q '"preset":\["shinbundang"' || fail "프리셋이 응답�
 # 1호선은 계통마다 뷰를 나누되(경인, 경부, 광명셔틀) API 노선명은 하나다. 이 값이 어긋나면 호출이 배로 나간다.
 [ "$(echo "$LINES" | grep -o '"apiName":"1호선"' | wc -l)" -eq 3 ] \
   || fail "1호선 뷰 셋이 같은 API 노선을 가리키지 않는다: $LINES"
+# 목록 밖 종착역으로 가는 열차가 뷰를 떠나는 역. 화면은 관심 구간 끝 너머의 열차가 끝 역까지 오는지
+# 이것으로 가린다. 빠지면 구로에서 갈라지는 인천행이 가산디지털단지로 들어오는 열차처럼 그려진다.
+echo "$LINES" | python3 -c '
+import json, sys
+views = {line["slug"]: line for line in json.loads(sys.stdin.buffer.read().decode("utf-8"))["lines"]}
+anchors = views["line1-gyeongbu"]["anchors"]
+sys.exit(0 if anchors.get("인천") == "구로" and anchors.get("서동탄") == "병점" else 1)
+' || fail "경부 뷰의 갈라지는 역이 응답에 없다: $LINES"
 
 # 호출 원장. 위 trains 요청으로 서울시 API 를 여섯 번 불렀으니 그것이 파일에 남아야 한다. 실시간
 # 위치가 세 노선에 한 번씩, 3423 을 다시 보느라 역 코드 한 번과 평일 시간표 상하행 두 번이다.

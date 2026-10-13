@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonProperty
 import kr.kennysoft.kennymetro.domain.Direction
 import kr.kennysoft.kennymetro.domain.Line
 import kr.kennysoft.kennymetro.domain.Train
+import kr.kennysoft.kennymetro.domain.TrainStatus
 import org.slf4j.LoggerFactory
 import org.springframework.aot.hint.annotation.RegisterReflectionForBinding
 import org.springframework.boot.context.properties.ConfigurationProperties
@@ -89,21 +90,58 @@ private fun stationIndex(code: String, line: Line): Int? {
 /**
  * 실시간 위치 응답을 도메인 열차로 옮긴다. 판정 규칙은 서울시 쪽과 같다 - 현재역과
  * 종착역이 같으면 운행을 마치는 중이므로 제외하고, 방향은 두 역의 자리로 정한다.
+ *
+ * <p>
+ * 달리는 중인 열차의 역 코드는 떠난 역이고 `time` 은 떠난 뒤 흐른 초다. 서 있는 동안은 같은 역 코드로
+ * 선 뒤 흐른 초가 온다(DESIGN.md 2.4).
  */
 fun EverlineTrainDto.toTrain(line: Line): Train? {
     val currentIndex = stationIndex(stationCode, line) ?: return null
     val destinationIndex = stationIndex(destinationCode, line) ?: return null
     if (currentIndex == destinationIndex) return null
 
+    val direction = if (destinationIndex > currentIndex) Direction.DOWN else Direction.UP
+    val status = when (statusCode) {
+        STATUS_STOPPED -> TrainStatus.STOPPED
+        STATUS_RUNNING -> TrainStatus.DEPARTED
+        else -> null
+    }
     return Train(
         trainNo = trainNo,
         currentStation = line.stations[currentIndex],
         destination = line.stations[destinationIndex],
-        direction = if (destinationIndex > currentIndex) Direction.DOWN else Direction.UP,
+        direction = direction,
         // 이 엔드포인트에는 막차와 급행 표시가 없다. 용인경전철은 급행 운행도 없다.
         isLastTrain = false,
         isExpress = false,
         service = line.serviceAt(destinationIndex),
         fleet = line.fleet?.labelFor(trainNo),
+        status = status,
+        elapsedSeconds = time.toIntOrNull(),
+        segmentSeconds = if (status == TrainStatus.DEPARTED) segmentSeconds(currentIndex, direction) else null,
     )
 }
+
+/** 떠난 역에서 다음 역까지 걸리는 초. 표에 없는 자리면 null 이다. */
+private fun segmentSeconds(departedIndex: Int, direction: Direction): Int? = when (direction) {
+    Direction.DOWN -> DOWN_SEGMENT_SECONDS.getOrNull(departedIndex)
+    Direction.UP -> UP_SEGMENT_SECONDS.getOrNull(departedIndex - 1)
+}
+
+/** 공식 스크립트의 주행 상태 값. */
+private const val STATUS_RUNNING = "3"
+
+/** 공식 스크립트의 정차 상태 값. */
+private const val STATUS_STOPPED = "2"
+
+/**
+ * 하행(전대 에버랜드 쪽)으로 역과 역 사이를 달리는 데 걸리는 초. 공식 실시간 페이지 스크립트의 배열이다.
+ * k 번째 값이 k 번째 역에서 k+1 번째 역까지다(DESIGN.md 2.4).
+ */
+private val DOWN_SEGMENT_SECONDS = listOf(89, 74, 78, 83, 121, 147, 79, 77, 64, 71, 102, 110, 77, 179)
+
+/**
+ * 상행(기흥 쪽)으로 걸리는 초. 하행 배열과 같은 구간 순서로 적혀 있어 k 번째 값이 k+1 번째 역에서
+ * k 번째 역까지다(DESIGN.md 2.4).
+ */
+private val UP_SEGMENT_SECONDS = listOf(96, 82, 77, 86, 122, 172, 79, 75, 62, 70, 76, 124, 85, 184)

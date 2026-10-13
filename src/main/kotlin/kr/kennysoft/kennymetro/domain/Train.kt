@@ -10,6 +10,11 @@ import kr.kennysoft.kennymetro.seoul.TrainPositionDto
  *                    시간표로도 찾지 못하면 null 이다(DESIGN.md 2.2.2).
  * @param service 평소 종착역까지 가는지, 먼저 끝나는지, 더 가는지, 다른 계통으로 갈라지는지.
  * @param fleet 몇 차분 차량인지. 편성번호로 차량을 특정할 수 있는 노선에만 있다.
+ * @param status 현재역에 들어오는 중인지, 서 있는지, 떠났는지. 화면이 역과 역 사이에 놓는 근거다.
+ *               API 가 모르는 값을 주면 null 이고, 화면은 역에 선 것으로 그린다.
+ * @param elapsedSeconds 그 상태가 된 뒤 흐른 초. 용인경전철만 준다.
+ * @param segmentSeconds 떠난 역에서 다음 역까지 걸리는 초. 용인경전철이 달리는 중일 때만 있다. 화면은
+ *                       흐른 초를 이것으로 나눠 역 사이 어디쯤인지 그린다.
  */
 data class Train(
     val trainNo: String,
@@ -20,6 +25,9 @@ data class Train(
     val isExpress: Boolean,
     val service: ServiceKind,
     val fleet: String?,
+    val status: TrainStatus?,
+    val elapsedSeconds: Int?,
+    val segmentSeconds: Int?,
 )
 
 enum class Direction {
@@ -28,6 +36,29 @@ enum class Direction {
 
     /** 역 순서가 커지는 쪽. 신분당선은 광교 방면, 2호선은 내선(`updnLine` 0). */
     DOWN,
+}
+
+/** 열차가 현재역의 어디쯤에 있는지. */
+enum class TrainStatus {
+    /** 현재역으로 들어오는 중이다. 직전 역과 현재역 사이에 있다. */
+    APPROACHING,
+
+    /** 현재역에 서 있다. */
+    STOPPED,
+
+    /** 현재역을 떠났다. 현재역과 다음 역 사이에 있다. */
+    DEPARTED,
+}
+
+/**
+ * `trainSttus` 를 옮긴다. 0 진입, 1 도착, 2 출발, 3 전역출발이다(DESIGN.md 2.2). 전역출발은 직전 역을
+ * 떠나 현재역으로 오는 중이라 진입과 같은 자리에 둔다.
+ */
+private fun TrainPositionDto.status(): TrainStatus? = when (trainSttus) {
+    "0", "3" -> TrainStatus.APPROACHING
+    "1" -> TrainStatus.STOPPED
+    "2" -> TrainStatus.DEPARTED
+    else -> null
 }
 
 /**
@@ -121,6 +152,9 @@ private fun TrainPositionDto.toLinearTrain(line: Line, currentIndex: Int, termin
         isExpress = directAt == "1",
         service = destination.service,
         fleet = line.fleet?.labelFor(trainNo),
+        status = status(),
+        elapsedSeconds = null,
+        segmentSeconds = null,
     )
 }
 
@@ -137,6 +171,9 @@ private fun TrainPositionDto.toTrainWithoutDestination(line: Line) = Train(
     isExpress = directAt == "1",
     service = ServiceKind.NORMAL,
     fleet = line.fleet?.labelFor(trainNo),
+    status = status(),
+    elapsedSeconds = null,
+    segmentSeconds = null,
 )
 
 /**
@@ -170,5 +207,8 @@ private fun TrainPositionDto.toCircularTrain(line: Line): Train? {
         isExpress = directAt == "1",
         service = line.serviceAt(destinationIndex),
         fleet = line.fleet?.labelFor(trainNo),
+        status = status(),
+        elapsedSeconds = null,
+        segmentSeconds = null,
     )
 }

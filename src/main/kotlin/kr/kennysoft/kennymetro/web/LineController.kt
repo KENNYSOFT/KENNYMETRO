@@ -48,6 +48,7 @@ class LineController(
         budgeted = source == LineSource.SEOUL,
         live = source != LineSource.NONE,
         extraDestinations = ArrayList(anchors.keys),
+        anchors = LinkedHashMap(anchors.mapValues { (_, destination) -> stations[destination.index] }),
         downOnly = ArrayList(downOnly),
         noService = ArrayList(noService),
     )
@@ -86,6 +87,11 @@ data class LineView(
      * 열차의 종착이다. `scripts/probe-coverage.sh` 가 역명을 대조할 때 오탐을 막는 데 쓴다.
      */
     val extraDestinations: List<String>,
+    /**
+     * 목록에 없는 종착역과, 그리로 가는 열차가 이 뷰를 떠나는 역. 1호선 경부 뷰의 인천행은 구로에서
+     * 갈라진다. 화면은 관심 구간 끝 너머의 열차가 끝 역까지 오는지 이것으로 가린다.
+     */
+    val anchors: Map<String, String>,
     /** 열차가 down 쪽으로만 지나는 역. 화면은 그 역의 왼쪽 화살표를 그리지 않는다. */
     val downOnly: List<String>,
     /** 열차가 서지도 지나지도 않는 역. 화면은 흐리게 세우고 화살표를 그리지 않는다. */

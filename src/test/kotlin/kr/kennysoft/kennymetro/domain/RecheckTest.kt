@@ -117,12 +117,13 @@ class RecheckTest : FreeSpec({
         // when
         val train = glitch.toTrain(uisinseol, Recheck.Unknown)
 
-        // then - 어디서 끝나는지 모르니 단축이나 연장으로 칠하지 않는다. 막차와 급행 표시는 그대로다.
+        // then - 어디서 끝나는지 모르니 단축이나 연장으로 칠하지 않는다. 막차와 급행, 역에 선 상태는 그대로다.
         train?.destination.shouldBeNull()
         train?.direction shouldBe Direction.UP
         train?.service shouldBe ServiceKind.NORMAL
         train?.isLastTrain shouldBe true
         train?.isExpress shouldBe true
+        train?.status shouldBe TrainStatus.STOPPED
     }
 
     "이 뷰에서 어긋나지 않는 열차에는 다시 본 결과를 쓰지 않는다" {

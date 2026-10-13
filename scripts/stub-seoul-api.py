@@ -20,7 +20,7 @@ MODE = os.environ.get("STUB_MODE", "trains")
 PORT = int(os.environ.get("STUB_PORT", "18090"))
 
 
-def position(train_no, current, terminal, updn, recptn="2026-09-22 21:00:00", last="0"):
+def position(train_no, current, terminal, updn, recptn="2026-09-22 21:00:00", last="0", sttus="1"):
     return {
         "subwayId": "1077",
         "subwayNm": "신분당선",
@@ -30,7 +30,7 @@ def position(train_no, current, terminal, updn, recptn="2026-09-22 21:00:00", la
         "statnTid": "1077000001",
         "statnTnm": terminal,
         "updnLine": updn,
-        "trainSttus": "1",
+        "trainSttus": sttus,
         "directAt": "0",
         "lstcarAt": last,
         "recptnDt": recptn,
@@ -46,7 +46,8 @@ def positions(*trains):
 
 POSITIONS = {
     "신분당선": positions(
-        position("11", "청계산입구", "광교", "1"),
+        # 청계산입구를 떠나 판교로 가는 중이다. 화면은 두 역 사이에 그린다.
+        position("11", "청계산입구", "광교", "1", sttus="2"),
         # 광교에 있으면서 종착이 신사다. updnLine 은 직전 운행의 값이라 상행으로 뒤집혀야 한다.
         position("12", "광교", "신사", "1"),
         # 현재역과 종착역이 같다. 운행을 마치는 중이라 응답에서 빠져야 한다.

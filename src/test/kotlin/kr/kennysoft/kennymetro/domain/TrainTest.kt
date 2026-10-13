@@ -81,6 +81,31 @@ class TrainTest : FreeSpec({
         train.isLastTrain.shouldBeTrue()
         train.isExpress.shouldBeTrue()
     }
+
+    "진입, 도착, 출발을 옮기고 전역출발은 진입과 같은 자리에 둔다" {
+        // given
+        fun statusOf(trainSttus: String) =
+            position(current = "판교", terminal = "광교", updnLine = "1", trainSttus = trainSttus).toTrain(TestLines.shinbundang)!!.status
+
+        // when & then - 전역출발은 직전 역을 떠나 판교로 오는 중이다.
+        statusOf("0") shouldBe TrainStatus.APPROACHING
+        statusOf("1") shouldBe TrainStatus.STOPPED
+        statusOf("2") shouldBe TrainStatus.DEPARTED
+        statusOf("3") shouldBe TrainStatus.APPROACHING
+    }
+
+    "모르는 상태 값이면 비워 역에 선 것으로 그리게 한다" {
+        // given
+        val dto = position(current = "판교", terminal = "광교", updnLine = "1", trainSttus = "9")
+
+        // when
+        val train = dto.toTrain(TestLines.shinbundang)!!
+
+        // then - 흐른 초와 구간 소요시간은 용인경전철만 준다.
+        train.status.shouldBeNull()
+        train.elapsedSeconds.shouldBeNull()
+        train.segmentSeconds.shouldBeNull()
+    }
 })
 
 private fun position(
@@ -89,6 +114,7 @@ private fun position(
     updnLine: String,
     lstcarAt: String = "0",
     directAt: String = "0",
+    trainSttus: String = "1",
 ) = TrainPositionDto(
     subwayId = "1077",
     subwayNm = "신분당선",
@@ -98,7 +124,7 @@ private fun position(
     statnTid = "1077000001",
     statnTnm = terminal,
     updnLine = updnLine,
-    trainSttus = "1",
+    trainSttus = trainSttus,
     directAt = directAt,
     lstcarAt = lstcarAt,
     recptnDt = "2026-09-21 10:22:23",

@@ -60,6 +60,14 @@ class CircularTrainTest : FreeSpec({
         onBranch?.destination shouldBe "성수"
         onBranch?.direction shouldBe Direction.UP
     }
+
+    "순환선 열차도 진입과 출발을 옮긴다" {
+        // given
+        val departed = train(current = "강남", terminal = "성수종착", updnLine = "0", trainSttus = "2")
+
+        // when & then
+        departed?.status shouldBe TrainStatus.DEPARTED
+    }
 })
 
 private fun train(
@@ -67,6 +75,7 @@ private fun train(
     terminal: String,
     updnLine: String,
     line: Line = TestLines.line2,
+    trainSttus: String = "1",
 ): Train? = listOf(
     TrainPositionDto(
         subwayId = "1002",
@@ -77,7 +86,7 @@ private fun train(
         statnTid = "1002000211",
         statnTnm = terminal,
         updnLine = updnLine,
-        trainSttus = "1",
+        trainSttus = trainSttus,
         directAt = "0",
         lstcarAt = "0",
         recptnDt = "2026-09-22 23:15:13",

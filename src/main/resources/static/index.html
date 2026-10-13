@@ -107,6 +107,37 @@
   .name .key { font-weight: 700; }
   /* 열차가 서지도 지나지도 않는 역. 끊긴 두 구간을 한 줄로 세우려고 목록에 둔 자리다(GTX-A 삼성). */
   .name .no-service { color: var(--muted); }
+
+  /* 관심 구간 끝 너머의 역. 구간으로 들어오는 쪽 칸에만 열차를 놓고 역 이름을 흐리게 둔다. 레일 선은
+     끊어 그린다 - 선이 .rail 하나라 그 위에 배경색 점선을 덮는다. */
+  .stop.peek { min-height: 30px; }
+  .name .peek-name { color: var(--muted); }
+  /* 이름 칸의 배경과 여백은 바깥 조각에만 준다. 안쪽 동그라미 묶음은 받지 않는다. */
+  .peek-name span { padding: 0; background: none; border-radius: 0; }
+  .segment.peek::before {
+    content: ""; position: absolute; left: 50%; top: 0; bottom: 0;
+    width: 2px; margin-left: -1px;
+    background: repeating-linear-gradient(to bottom, var(--bg) 0 4px, transparent 4px 8px);
+  }
+  .segment.peek .dir { opacity: .5; }
+  /* 끝 너머 몇 역 안에 들어오는 열차가 없을 때 그보다 바깥의 한 대를 적는 글. */
+  .far-note { color: var(--muted); font-size: 11px; white-space: nowrap; }
+
+  /* 관심 구간의 끝. 가로 점선이 경계이고, 노선도에서 바로 한 역씩 넓히고 좁히는 버튼을 그 위에 둔다.
+     버튼이 레일 세로선을 덮도록 쌓임 순서를 올린다. */
+  .edge {
+    position: relative; z-index: 1;
+    display: flex; justify-content: center; gap: 6px; flex-wrap: wrap;
+    padding: 6px 0;
+  }
+  .edge::before {
+    content: ""; position: absolute; left: 0; right: 0; top: 50%;
+    border-top: 1px dashed var(--rail); z-index: -1;
+  }
+  .edge button {
+    border: 0; background: var(--card); color: var(--muted); cursor: pointer;
+    font: inherit; font-size: 11px; padding: 2px 9px; border-radius: 999px;
+  }
   .lane { display: flex; gap: 6px; flex-wrap: wrap; min-height: 24px; align-items: center; min-width: 0; }
   .lane.up { justify-content: flex-end; }
   .lane.down { justify-content: flex-start; }
@@ -173,6 +204,7 @@
   .set { border-top: 1px dashed var(--edge); padding-top: 8px; }
   .set-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
   .set-label { color: var(--muted); min-width: 56px; }
+  .set-hint { color: var(--muted); }
   .set select { font: inherit; padding: 3px 6px; border-radius: 6px; border: 1px solid var(--edge); background: var(--bg); color: inherit; }
   /* 주요 역은 관심 구간 안의 역만 고를 수 있다. 눌린 것이 굵게 선다. */
   .set-keys { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -265,6 +297,8 @@
 
 <script>
 const REFRESH_MS = 30000;
+/** 역 사이에 놓인 열차를 다시 그리는 주기. 용인경전철은 한 역 사이가 1분에서 3분이라 이 정도면 나아가는 게 보인다. */
+const SHIFT_MS = 5000;
 const STORAGE_KEY = 'kennymetro.view';
 
 let lines = [];
@@ -277,11 +311,11 @@ let transferColors = {};
 /**
  * 이 브라우저의 설정.
  *
- * 보여줄 노선, 관심 구간, 주요 역은 사람마다 다르다. 서버에 계정을 두지 않으므로 여기에
- * 둔다. 비어 있는 칸은 서버가 준 프리셋을 쓴다 - 즉 아무것도 고르지 않은 사람은 프리셋을
- * 보고, 고친 항목만 자기 값으로 덮인다.
+ * 보여줄 노선, 관심 구간, 주요 역, 구간 끝 너머로 미리 볼 역 수는 사람마다 다르다. 서버에 계정을
+ * 두지 않으므로 여기에 둔다. 비어 있는 칸은 서버가 준 프리셋이나 기본값을 쓴다 - 즉 아무것도
+ * 고르지 않은 사람은 프리셋을 보고, 고친 항목만 자기 값으로 덮인다.
  */
-let view = { lines: null, open: [], full: [], focus: {}, key: {} };
+let view = { lines: null, open: [], full: [], focus: {}, key: {}, peek: {} };
 
 /** 설정 패널이 열려 있는지. 화면을 다시 그려도 닫히지 않게 들고 있을 뿐 저장하지는 않는다. */
 const openSettings = new Set();
@@ -297,6 +331,7 @@ function loadView() {
       full: Array.isArray(saved.full) ? renameViews(saved.full) : [],
       focus: saved.focus && typeof saved.focus === 'object' ? saved.focus : {},
       key: saved.key && typeof saved.key === 'object' ? saved.key : {},
+      peek: saved.peek && typeof saved.peek === 'object' ? saved.peek : {},
     };
   } catch (e) {
     // 사생활 보호 모드나 저장소 차단. 기본값으로 간다.
@@ -371,13 +406,111 @@ function keysOf(line) {
   return Array.isArray(mine) ? mine : line.keyStations;
 }
 
+/** 관심 구간 끝 너머로 미리 볼 역 수의 기본값. 3역이면 보통 5분 남짓 걸려 끝 역에서 기다릴지 정하기에 알맞다. */
+const DEFAULT_PEEK = 3;
+const MAX_PEEK = 5;
+
+/** 그 노선에서 관심 구간 끝 너머로 미리 볼 역 수. 고쳐 둔 것이 없으면 기본값이다. */
+function peekOf(line) {
+  const mine = view.peek[line.slug];
+  return Number.isInteger(mine) && mine >= 0 && mine <= MAX_PEEK ? mine : DEFAULT_PEEK;
+}
+
+/**
+ * 관심 구간을 바꾼다. 프리셋과 같아지면 저장에서 빼서, 나중에 프리셋이 바뀌면 손대지 않은 노선은
+ * 새 프리셋을 따라가게 한다. 프리셋이 없는 노선은 전 구간이 프리셋이다.
+ */
+function setFocus(line, from, to) {
+  const presetFrom = line.focusFrom === null ? 0 : line.focusFrom;
+  const presetTo = line.focusTo === null ? line.stations.length - 1 : line.focusTo;
+  if (from === presetFrom && to === presetTo) delete view.focus[line.slug];
+  else view.focus[line.slug] = [line.stations[from], line.stations[to]];
+  saveView();
+  rebuildSection(line);
+}
+
 /* ---------- 노선도 ---------- */
 
-/** 화면에 그릴 역 범위. 전 구간 보기가 아니면 관심 구간만 그린다. */
-function rangeOf(line) {
-  const focus = focusOf(line);
-  if (isFull(line.slug) || !focus) return { from: 0, to: line.stations.length - 1 };
-  return focus;
+/**
+ * 화면에 그릴 줄. 관심 구간과, 그 위아래 끝 너머로 미리 볼 역이다.
+ *
+ * 전 구간 보기면 목록 전부를 그리고 끝이 없다. 관심 구간이 없는 노선은 목록 전부가 관심 구간이다.
+ * 실시간 위치가 없는 노선은 그릴 열차가 없어 끝 너머를 보지 않는다. 순환선은 위아래 끝 너머가 같은
+ * 역들이라 둘이 겹치지 않게 나눈다.
+ */
+function layoutOf(line) {
+  const last = line.stations.length - 1;
+  if (isFull(line.slug)) {
+    return { full: true, focus: { from: 0, to: last }, walk: { above: [], below: [] }, shown: { above: 0, below: 0 } };
+  }
+  const focus = focusOf(line) || { from: 0, to: last };
+  const walk = { above: outward(line, focus, 'above'), below: outward(line, focus, 'below') };
+  const peek = line.live ? peekOf(line) : 0;
+  let above = Math.min(peek, walk.above.length);
+  let below = Math.min(peek, walk.below.length);
+  if (line.circular) {
+    above = Math.min(peek, Math.ceil(walk.above.length / 2));
+    below = Math.min(peek, walk.below.length - above);
+  }
+  return { full: false, focus, walk, shown: { above, below } };
+}
+
+/** 끝 너머로 그릴 역. 위쪽은 바깥 역부터, 아래쪽은 안쪽 역부터라 둘 다 목록 순서다. */
+function rowsOf(layout, side) {
+  const rows = layout.walk[side].slice(0, layout.shown[side]);
+  return side === 'above' ? rows.reverse() : rows;
+}
+
+/**
+ * 관심 구간 끝에서 바깥으로 한 역씩, 구간으로 들어오는 열차가 지나는 역. 가까운 역부터다.
+ *
+ * 위쪽 끝 너머에서는 아래로 가는 열차가, 아래쪽 끝 너머에서는 위로 가는 열차가 구간에 들어온다.
+ * 열차가 다니지 않는 역(GTX-A 삼성)에서 멈추고, 아래쪽은 위로 가는 열차가 없는 역(6호선 응암 순환
+ * 구간)에서도 멈춘다. 순환선은 목록 끝을 넘어 반대쪽 끝에서 이어 세고, 구간의 다른 끝에서 멈춘다.
+ */
+function outward(line, focus, side) {
+  const n = line.stations.length;
+  const step = side === 'above' ? -1 : 1;
+  const start = side === 'above' ? focus.from : focus.to;
+  const room = line.circular ? n - (focus.to - focus.from + 1) : n;
+  const found = [];
+  for (let k = 1; k <= room; k++) {
+    let i = start + step * k;
+    if (line.circular) i = (i % n + n) % n;
+    else if (i < 0 || i >= n) break;
+    const name = line.stations[i];
+    if (line.noService.includes(name)) break;
+    if (side === 'below' && line.downOnly.includes(name)) break;
+    found.push(i);
+  }
+  return found;
+}
+
+/**
+ * 끝 너머의 그 열차가 관심 구간으로 들어오는지. 들어오는 쪽으로 가면서, 끝 역에 닿기 전에 끝나거나
+ * 갈라지지 않아야 한다. 신분당선 정자행은 정자에서 끝나고, 1호선 경부 뷰의 인천행은 구로에서 갈라진다.
+ */
+function isIncoming(line, focus, side, t, at) {
+  if (t.direction !== (side === 'above' ? 'DOWN' : 'UP')) return false;
+  const end = endIndexOf(line, t);
+  // 종착역을 모르면 방향만 믿는다.
+  if (end == null) return true;
+  const edge = side === 'above' ? focus.from : focus.to;
+  if (!line.circular) return side === 'above' ? end >= edge : end <= edge;
+  // 순환선의 평소 종착역(성수)에서는 운행만 바뀌고 열차는 계속 돈다.
+  if (t.service === 'NORMAL') return true;
+  const n = line.stations.length;
+  const ahead = i => side === 'above' ? (i - at + n) % n : (at - i + n) % n;
+  return ahead(end) >= ahead(edge);
+}
+
+/** 그 열차가 이 뷰에서 마지막으로 닿는 역의 자리. 목록 밖 종착역이면 그 열차가 이 뷰를 떠나는 역이다. */
+function endIndexOf(line, t) {
+  if (t.destination == null) return null;
+  const own = line.stations.indexOf(t.destination);
+  if (own >= 0) return own;
+  const leaves = line.stations.indexOf(line.anchors[t.destination]);
+  return leaves >= 0 ? leaves : null;
 }
 
 /**
@@ -403,14 +536,24 @@ function nameWidth(names, dotCount) {
 
 function buildRail(line) {
   const rail = el('div', 'rail');
-  const range = rangeOf(line);
+  // 역 사이로 열차를 옮길 때 순환선은 목록 끝을 넘어 이웃 역을 찾는다.
+  rail.dataset.count = String(line.stations.length);
+  rail.dataset.circular = String(line.circular);
+  const layout = layoutOf(line);
+  const range = layout.focus;
   const transfers = transfersByLine[line.slug];
   const keys = keysOf(line);
   const dotsAt = name => {
     const info = transfers && transfers.byStation.get(name);
     return info ? transferDots(line, info) : [];
   };
-  rail.style.setProperty('--name-w', nameWidth(line.stations.slice(range.from, range.to + 1), name => dotsAt(name).length));
+  const above = rowsOf(layout, 'above');
+  const below = rowsOf(layout, 'below');
+  const drawn = [...above, ...below].map(i => line.stations[i]).concat(line.stations.slice(range.from, range.to + 1));
+  rail.style.setProperty('--name-w', nameWidth(drawn, name => dotsAt(name).length));
+
+  if (above.length > 0) rail.appendChild(buildPeek(line, above, 'above', dotsAt));
+  if (!layout.full) appendEdge(rail, line, range, 'above');
   let segment = null;
   let lanes = null;
   for (let i = range.from; i <= range.to; i++) {
@@ -442,7 +585,67 @@ function buildRail(line) {
     segment.appendChild(stop);
     if (info) segment.appendChild(buildTransferPanel(panelId, info, line));
   }
+  if (!layout.full) appendEdge(rail, line, range, 'below');
+  if (below.length > 0) rail.appendChild(buildPeek(line, below, 'below', dotsAt));
   return rail;
+}
+
+/**
+ * 관심 구간 끝 너머의 역. 구간으로 들어오는 열차만 놓으므로 그쪽 칸의 화살표만 깐다. 위쪽 끝 너머로는
+ * 아래로 가는 열차가, 아래쪽 끝 너머로는 위로 가는 열차가 들어온다. 역 이름은 흐리게 세우되 환승 노선
+ * 색은 그대로 붙인다.
+ */
+function buildPeek(line, rows, side, dotsAt) {
+  const segment = buildSegment(side === 'above' ? 'down' : 'up');
+  segment.classList.add('peek');
+  segment.dataset.side = side;
+  for (const i of rows) {
+    const name = line.stations[i];
+    const stop = el('div', 'stop peek');
+    stop.dataset.index = String(i);
+    stop.appendChild(el('div', 'lane up', ''));
+    const label = el('div', 'name');
+    const node = el('span', 'peek-name', name);
+    const dots = dotsAt(name);
+    if (dots.length > 0) {
+      node.appendChild(dotsBox(dots));
+      node.title = dots.join(', ') + ' 환승';
+    }
+    label.appendChild(node);
+    stop.appendChild(label);
+    stop.appendChild(el('div', 'lane down', ''));
+    segment.appendChild(stop);
+  }
+  return segment;
+}
+
+/**
+ * 관심 구간의 끝. 구간 설정을 열지 않고 노선도에서 바로 한 역씩 넓히고 좁힌다. 바깥에 역이 없으면
+ * 넓히지 못하고, 구간이 한 역이면 좁히지 못한다. 둘 다 못 하면 줄을 세우지 않는다.
+ */
+function appendEdge(rail, line, focus, side) {
+  const box = el('div', 'edge');
+  box.dataset.side = side;
+  const outer = side === 'above' ? focus.from - 1 : focus.to + 1;
+  if (outer >= 0 && outer < line.stations.length) {
+    box.appendChild(edgeButton(line.stations[outer] + ' 넣기', '관심 구간에 ' + line.stations[outer] + '역을 더합니다',
+      () => side === 'above' ? setFocus(line, outer, focus.to) : setFocus(line, focus.from, outer)));
+  }
+  if (focus.from < focus.to) {
+    const inner = side === 'above' ? focus.from : focus.to;
+    box.appendChild(edgeButton(line.stations[inner] + ' 빼기', '관심 구간에서 ' + line.stations[inner] + '역을 뺍니다',
+      () => side === 'above' ? setFocus(line, focus.from + 1, focus.to) : setFocus(line, focus.from, focus.to - 1)));
+  }
+  if (box.children.length > 0) rail.appendChild(box);
+}
+
+function edgeButton(text, label, onClick) {
+  const btn = el('button', null, text);
+  btn.type = 'button';
+  btn.title = label;
+  btn.setAttribute('aria-label', label);
+  btn.addEventListener('click', onClick);
+  return btn;
 }
 
 /**
@@ -456,32 +659,151 @@ function lanesAt(line, name) {
 
 /**
  * 화살표를 깔 구간. 화살표는 구간 전체에 이어 깔리므로, 열차가 한쪽으로만 다니거나 다니지 않는
- * 자리는 구간을 따로 열어 다니지 않는 쪽의 화살표를 뺀다.
+ * 자리는 구간을 따로 열어 다니지 않는 쪽의 화살표를 뺀다. 관심 구간 끝 너머는 구간으로 들어오는
+ * 쪽만 깐다.
  */
 function buildSegment(lanes) {
   const segment = el('div', 'segment');
-  if (lanes === 'both') segment.appendChild(el('div', 'dir up'));
-  if (lanes !== 'none') segment.appendChild(el('div', 'dir down'));
+  if (lanes === 'both' || lanes === 'up') segment.appendChild(el('div', 'dir up'));
+  if (lanes === 'both' || lanes === 'down') segment.appendChild(el('div', 'dir down'));
   return segment;
 }
 
-function placeTrains(section, line, trains) {
-  section.querySelectorAll('.lane').forEach(l => l.replaceChildren());
-  const range = rangeOf(line);
-  let outside = 0;
-  const placed = [];
+/**
+ * 열차를 놓는다. 관심 구간에는 모두, 끝 너머에는 구간으로 들어오는 열차만 놓는다. 끝 너머 몇 역 안에
+ * 들어오는 열차가 없으면 그보다 바깥에서 가장 가까운 한 대를 적는다.
+ *
+ * 돌려주는 값은 어디에도 그리지 않은 열차 수다. 안 보이는 것과 없는 것을 가르려고 적는다.
+ */
+function placeTrains(section, line, trains, fetchedAt) {
+  const rail = section.querySelector('.rail');
+  rail.querySelectorAll('.lane').forEach(l => l.replaceChildren());
+  rail.querySelectorAll('.stop.far').forEach(row => row.remove());
+  const layout = layoutOf(line);
+  // 용인경전철이 역 사이 어디쯤인지는 받은 뒤 흐른 시간까지 더해 정한다.
+  const fetched = fetchedAt ? new Date(fetchedAt).getTime() : Date.now();
+  const byStation = new Map();
+  let known = 0;
   for (const t of trains) {
-    const idx = line.stations.indexOf(t.currentStation);
-    if (idx < 0) continue;
-    if (idx < range.from || idx > range.to) { outside++; continue; }
-    const stop = section.querySelector('.stop[data-index="' + idx + '"]');
-    if (!stop) continue;
-    const lane = stop.querySelector(t.direction === 'UP' ? '.lane.up' : '.lane.down');
-    lane.appendChild(trainChip(line, t));
+    const i = line.stations.indexOf(t.currentStation);
+    if (i < 0) continue;
+    known++;
+    if (!byStation.has(i)) byStation.set(i, []);
+    byStation.get(i).push(t);
+  }
+  const placed = [];
+  const put = (t, i) => {
+    const stop = rail.querySelector('.stop[data-index="' + i + '"]');
+    stop.querySelector(t.direction === 'UP' ? '.lane.up' : '.lane.down').appendChild(trainChip(line, t, i, fetched));
     placed.push(t);
+  };
+  for (let i = layout.focus.from; i <= layout.focus.to; i++) {
+    for (const t of byStation.get(i) || []) put(t, i);
+  }
+  for (const side of ['above', 'below']) {
+    const rows = rowsOf(layout, side);
+    if (rows.length === 0) continue;
+    let incoming = 0;
+    for (const i of rows) {
+      for (const t of byStation.get(i) || []) {
+        if (!isIncoming(line, layout.focus, side, t, i)) continue;
+        put(t, i);
+        incoming++;
+      }
+    }
+    if (incoming > 0) continue;
+    const far = buildFar(line, layout, side, byStation);
+    const segment = rail.querySelector('.segment.peek[data-side="' + side + '"]');
+    if (side === 'above') segment.insertBefore(far.row, segment.querySelector('.stop'));
+    else segment.appendChild(far.row);
+    if (far.train) placed.push(far.train);
   }
   renderKinds(section, placed);
-  return outside;
+  shiftChips(rail);
+  return known - placed.length;
+}
+
+/** 끝 너머의 열차를 글로 적을 때 붙이는 상태. 역에 서 있으면 적지 않는다. */
+const STATUS_WORDS = { APPROACHING: '진입', DEPARTED: '출발' };
+
+/**
+ * 끝 너머 몇 역 안에 구간으로 들어오는 열차가 없을 때 적는 줄. 그보다 바깥에서 가장 가까운 한 대와
+ * 끝 역에서 몇 역 떨어졌는지를 적고, 한 대도 없으면 없다고 적는다.
+ */
+function buildFar(line, layout, side, byStation) {
+  const row = el('div', 'stop peek far');
+  const up = el('div', 'lane up', '');
+  const down = el('div', 'lane down', '');
+  row.appendChild(up);
+  row.appendChild(el('div', 'name'));
+  row.appendChild(down);
+  const lane = side === 'above' ? down : up;
+  const walk = layout.walk[side];
+  for (let k = layout.shown[side]; k < walk.length; k++) {
+    const i = walk[k];
+    const t = (byStation.get(i) || []).find(t => isIncoming(line, layout.focus, side, t, i));
+    if (!t) continue;
+    const status = STATUS_WORDS[t.status];
+    const note = el('span', 'far-note', line.stations[i] + (status ? ' ' + status : '') + ', ' + (k + 1) + '역 전');
+    const chip = trainChip(line, t);
+    // 칩이 레일 쪽에 붙게 왼쪽 칸은 글을 먼저, 오른쪽 칸은 칩을 먼저 둔다.
+    if (side === 'above') lane.append(chip, note);
+    else lane.append(note, chip);
+    return { row, train: t };
+  }
+  lane.appendChild(el('span', 'far-note', '다가오는 열차가 없습니다'));
+  return { row, train: null };
+}
+
+/** 진입과 출발은 역과 역 사이를 셋으로 나눈 자리에 둔다. 출발한 열차가 다음 역에 진입하는 열차보다 덜 간 자리다. */
+const STEP = 1 / 3;
+
+/** 소요시간을 넘겨도 다음 역에 닿은 것으로 그리지 않는다. 닿았는지는 다음 응답이 알려 준다. */
+const MAX_PROGRESS = 0.9;
+
+/**
+ * 역과 역 사이에 있는 열차를 그 사이로 옮긴다.
+ *
+ * 줄 높이가 역마다 달라(펼친 환승 문, 줄이 바뀐 칩, 관심 구간 끝) 그려진 두 역의 자리를 재어 옮긴다.
+ * 이웃 역이 그려져 있지 않으면 제 줄 높이만큼을 한 역 사이로 본다.
+ */
+function shiftChips(rail) {
+  const n = Number(rail.dataset.count);
+  const circular = rail.dataset.circular === 'true';
+  for (const chip of rail.querySelectorAll('.train[data-at]')) {
+    const offset = offsetOf(chip);
+    if (offset === 0) {
+      chip.style.transform = '';
+      continue;
+    }
+    let next = Number(chip.dataset.at) + Math.sign(offset);
+    if (circular) next = (next + n) % n;
+    const here = chip.closest('.stop').getBoundingClientRect();
+    const there = rail.querySelector('.stop[data-index="' + next + '"]');
+    const span = there ? centerOf(there.getBoundingClientRect()) - centerOf(here) : Math.sign(offset) * here.height;
+    chip.style.transform = 'translateY(' + (span * Math.abs(offset)).toFixed(1) + 'px)';
+  }
+}
+
+function centerOf(rect) {
+  return rect.top + rect.height / 2;
+}
+
+/**
+ * 그 열차가 현재역에서 몇 역만큼 떨어져 있는지. 목록 아래쪽이 양수다.
+ *
+ * 용인경전철은 떠난 뒤 흐른 초에 응답을 받은 뒤 흐른 시간을 더해 소요시간으로 나눈다. 그래서 다시
+ * 받지 않아도 다시 그릴 때마다 조금씩 나아간다.
+ */
+function offsetOf(chip) {
+  // 목록 위쪽(UP)으로 가는 열차는 다음 역의 자리 번호가 작다.
+  const ahead = chip.dataset.dir === 'UP' ? -1 : 1;
+  if (chip.dataset.status === 'APPROACHING') return -ahead * STEP;
+  if (chip.dataset.status !== 'DEPARTED') return 0;
+  const segment = Number(chip.dataset.segment);
+  if (!segment) return ahead * STEP;
+  const elapsed = Number(chip.dataset.elapsed) + Math.max(0, Date.now() - Number(chip.dataset.fetched)) / 1000;
+  return ahead * Math.min(Math.max(elapsed / segment, 0), MAX_PROGRESS);
 }
 
 /** 운행 종류마다 칩에 붙일 이름과 범례에 적을 설명. 평소 운행은 표시하지 않는다. */
@@ -491,13 +813,28 @@ const KINDS = {
   BRANCH: { cls: 'branch', label: '다른 계통', note: '이 노선을 지나다 갈라져 나갑니다' },
 };
 
-function trainChip(line, t) {
+/**
+ * 열차 칩. 역 줄에 놓는 칩은 그 역의 자리(at)와, 역 사이로 옮길 때 쓸 상태를 함께 단다. 끝 너머 바깥의
+ * 열차를 글과 함께 적는 칩은 역 줄에 있지 않아 옮기지 않는다.
+ */
+function trainChip(line, t, at, fetched) {
   const kind = KINDS[t.service];
   let cls = 'train';
   if (kind) cls += ' ' + kind.cls;
   if (t.fleet) cls += ' fleet';
   const chip = el('div', cls);
+  if (at !== undefined && t.status) {
+    chip.dataset.at = String(at);
+    chip.dataset.dir = t.direction;
+    chip.dataset.status = t.status;
+    if (t.segmentSeconds) {
+      chip.dataset.segment = String(t.segmentSeconds);
+      chip.dataset.elapsed = String(t.elapsedSeconds || 0);
+      chip.dataset.fetched = String(fetched);
+    }
+  }
   const title = [];
+  if (STATUS_WORDS[t.status]) title.push(t.currentStation + ' ' + STATUS_WORDS[t.status]);
   if (t.fleet) {
     const gen = line.fleet.generations.find(g => g.label === t.fleet);
     if (gen) chip.style.setProperty('--fleet', gen.color);
@@ -538,13 +875,7 @@ function transferToggle(name, panelId, dots) {
   btn.type = 'button';
   btn.appendChild(el('span', 'tr-label', name));
   if (dots.length > 0) {
-    const box = el('span', 'tr-dots');
-    for (const key of dots) {
-      const dot = el('span', 'tr-dot');
-      dot.style.background = transferColors[key];
-      box.appendChild(dot);
-    }
-    btn.appendChild(box);
+    btn.appendChild(dotsBox(dots));
     btn.title = dots.join(', ') + ' 환승';
     btn.setAttribute('aria-label', name + ', ' + dots.join(', ') + ' 환승');
   }
@@ -555,8 +886,21 @@ function transferToggle(name, panelId, dots) {
     const opening = panel.hidden;
     panel.hidden = !opening;
     btn.setAttribute('aria-expanded', String(opening));
+    // 패널이 역과 역 사이를 벌리거나 좁히므로 역 사이에 놓인 열차를 다시 맞춘다.
+    shiftChips(btn.closest('.rail'));
   });
   return btn;
+}
+
+/** 갈아탈 수 있는 노선의 색 동그라미 묶음. */
+function dotsBox(dots) {
+  const box = el('span', 'tr-dots');
+  for (const key of dots) {
+    const dot = el('span', 'tr-dot');
+    dot.style.background = transferColors[key];
+    box.appendChild(dot);
+  }
+  return box;
 }
 
 /**
@@ -783,6 +1127,13 @@ function buildLegend(line) {
   p.appendChild(document.createTextNode(line.circular
     ? '↑ 왼쪽은 ' + directionName(line.upLabel) + ', ↓ 오른쪽은 ' + directionName(line.downLabel) + ' 열차입니다. '
     : '↑ 왼쪽은 ' + line.upLabel + ' 방면, ↓ 오른쪽은 ' + line.downLabel + ' 방면입니다. '));
+  if (line.live) {
+    p.appendChild(document.createTextNode('역과 역 사이에 놓인 열차는 그 역을 떠났거나 들어오는 중입니다. '));
+    const layout = layoutOf(line);
+    if (layout.shown.above + layout.shown.below > 0) {
+      p.appendChild(document.createTextNode('흐린 역은 관심 구간 밖이라 구간으로 들어오는 열차만 그립니다. '));
+    }
+  }
   if (transfersByLine[line.slug]) {
     p.appendChild(document.createTextNode('밑줄 친 역에서 옆의 동그라미 색 노선으로 갈아탈 수 있습니다. 누르면 환승 문 위치가 타고 온 열차 쪽에 열립니다.'));
   }
@@ -898,9 +1249,9 @@ function buildSettings(line) {
   const from = stationSelect(line, focus.from);
   const to = stationSelect(line, focus.to);
   const onPick = () => {
-    view.focus[line.slug] = [line.stations[from.selectedIndex], line.stations[to.selectedIndex]];
-    saveView();
-    rebuildSection(line);
+    const a = from.selectedIndex;
+    const b = to.selectedIndex;
+    setFocus(line, Math.min(a, b), Math.max(a, b));
   };
   from.addEventListener('change', onPick);
   to.addEventListener('change', onPick);
@@ -913,11 +1264,15 @@ function buildSettings(line) {
   reset.addEventListener('click', () => {
     delete view.focus[line.slug];
     delete view.key[line.slug];
+    delete view.peek[line.slug];
     saveView();
     rebuildSection(line);
   });
   row.appendChild(reset);
   box.appendChild(row);
+
+  // 실시간 위치가 없는 노선은 끝 너머로 볼 열차가 없다.
+  if (line.live) box.appendChild(peekRow(line));
 
   const keyRow = el('div', 'set-row');
   keyRow.appendChild(el('span', 'set-label', '주요 역'));
@@ -954,6 +1309,30 @@ function stationSelect(line, selected) {
     select.appendChild(option);
   });
   return select;
+}
+
+/** 관심 구간 끝 너머로 미리 볼 역 수를 고르는 줄. 기본값을 고르면 저장에서 뺀다. */
+function peekRow(line) {
+  const row = el('div', 'set-row');
+  row.appendChild(el('span', 'set-label', '구간 밖'));
+  const select = document.createElement('select');
+  for (let count = 0; count <= MAX_PEEK; count++) {
+    const option = document.createElement('option');
+    option.value = String(count);
+    option.textContent = count === 0 ? '보지 않음' : count + '역';
+    option.selected = count === peekOf(line);
+    select.appendChild(option);
+  }
+  select.addEventListener('change', () => {
+    const count = Number(select.value);
+    if (count === DEFAULT_PEEK) delete view.peek[line.slug];
+    else view.peek[line.slug] = count;
+    saveView();
+    rebuildSection(line);
+  });
+  row.appendChild(select);
+  row.appendChild(el('span', 'set-hint', '끝 너머로 구간에 들어오는 열차를 흐리게 봅니다'));
+  return row;
 }
 
 /* ---------- 노선 고르기 ---------- */
@@ -1006,7 +1385,7 @@ function renderPicker() {
   reset.type = 'button';
   reset.addEventListener('click', () => {
     if (!confirm('고른 노선과 구간 설정을 지우고 기본 설정으로 돌아갑니다.')) return;
-    view = { lines: null, open: chosenDefaultOpen(), full: [], focus: {}, key: {} };
+    view = { lines: null, open: chosenDefaultOpen(), full: [], focus: {}, key: {}, peek: {} };
     saveView();
     renderAll();
   });
@@ -1083,12 +1462,12 @@ async function refresh(line) {
     const res = await fetch('/api/lines/' + line.slug + '/trains', { cache: 'no-store' });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
-    const outside = placeTrains(section, line, data.trains);
+    const hidden = placeTrains(section, line, data.trains, data.fetchedAt);
     budget.apiCallCount = data.apiCallCount;
     renderBudget();
 
     let text = '열차 ' + data.trains.length + '대 / ' + describeAge(data.fetchedAt);
-    if (outside > 0) text += ' / 구간 밖 ' + outside + '대';
+    if (hidden > 0) text += ' / 안 보이는 열차 ' + hidden + '대';
     status.textContent = text;
   } catch (e) {
     status.textContent = '불러오지 못했습니다';
@@ -1161,6 +1540,12 @@ setInterval(refreshOpen, REFRESH_MS);
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') refreshOpen();
 });
+
+// 용인경전철은 다시 받지 않아도 흐른 시간만큼 역 사이를 나아가게 그린다. 폭이 바뀌면 줄 높이가 달라져
+// 역 사이 자리를 다시 잰다.
+const shiftAll = () => document.querySelectorAll('.rail').forEach(shiftChips);
+setInterval(shiftAll, SHIFT_MS);
+window.addEventListener('resize', shiftAll);
 </script>
 </body>
 </html>
