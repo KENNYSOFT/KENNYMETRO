@@ -36,6 +36,7 @@ class TidyTest : FreeSpec({
         names.normalize("서울") shouldBe "서울역"
         names.normalize("응암순환(상선)") shouldBe "응암"
         names.normalize("지제") shouldBe "평택지제"
+        names.normalize("춘의역") shouldBe "춘의"
         // 이미 우리 표기인 이름은 그대로 둔다. GTX-A 는 서울역을 서울역으로 준다.
         names.normalize("서울역") shouldBe "서울역"
         names.normalize("강남") shouldBe "강남"
