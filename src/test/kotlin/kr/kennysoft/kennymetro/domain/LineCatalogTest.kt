@@ -198,6 +198,30 @@ class LineCatalogTest : FreeSpec({
         error.message shouldContain "no-service"
     }
 
+    "다른 노선 열차의 번호 머리가 비어 있으면 기동이 실패한다" {
+        // given - 빈 머리는 모든 번호에 맞는다. 조용히 넘어가면 그 노선의 열차가 통째로 사라진다.
+        val broken = MetroProperties(
+            listOf(
+                LineConfig(
+                    slug = "test",
+                    name = "테스트선",
+                    color = "#000000",
+                    source = LineSource.SEOUL,
+                    upLabel = "위",
+                    downLabel = "아래",
+                    stations = listOf("가", "나"),
+                    foreignTrainPrefixes = listOf(""),
+                )
+            )
+        )
+
+        // when
+        val error = shouldThrow<IllegalArgumentException> { LineCatalog(broken) }
+
+        // then - 어느 설정이 틀렸는지 알려야 한다.
+        error.message shouldContain "foreign-train-prefixes"
+    }
+
     "대괄호를 빠뜨려 키가 지워진 역명 치환은 기동이 실패한다" {
         // given - relaxed binding 이 한글 키를 지우면 빈 키가 된다. 조용히 넘어가면 그 역의 열차가 사라진다.
         val broken = MetroProperties(

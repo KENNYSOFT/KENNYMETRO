@@ -109,6 +109,8 @@ class LineCatalog(properties: MetroProperties) {
         keyStations.forEach { indexOrFail(it, "key-stations") }
         downOnly.forEach { indexOrFail(it, "down-only") }
         noService.forEach { indexOrFail(it, "no-service") }
+        // 빈 머리는 모든 번호에 맞아 그 노선의 열차가 통째로 사라진다.
+        require(foreignTrainPrefixes.none { it.isBlank() }) { "$slug: foreign-train-prefixes 에 빈 값이 있다: $foreignTrainPrefixes" }
         // 노선 순서와 반대로 적어도 되게 한다. 2호선 관심 구간이 강남에서 잠실인데
         // 역 순서로는 잠실이 앞이다.
         val bounds = focus.map { indexOrFail(it, "focus") }.sorted()
@@ -145,6 +147,7 @@ class LineCatalog(properties: MetroProperties) {
             anchors = anchors,
             downOnly = downOnly.toSet(),
             noService = noService.toSet(),
+            foreignTrainPrefixes = foreignTrainPrefixes,
             transferFile = transferFile ?: slug,
         )
     }

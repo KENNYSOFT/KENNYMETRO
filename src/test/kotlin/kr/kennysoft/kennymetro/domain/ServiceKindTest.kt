@@ -12,24 +12,29 @@ import kr.kennysoft.kennymetro.seoul.TrainPositionDto
 class ServiceKindTest : FreeSpec({
 
     "평소 종착역보다 먼저 끝나면 단축이고 더 가면 연장이다" {
-        // given - 수인분당선은 왕십리, 죽전, 고색에서 돌아가는 열차가 평소 운행이고 청량리까지 가는 열차는 드물다.
-        val line = TestLines.bySlug("suinbundang")
+        // given - 경의중앙선 동쪽은 용문에서 돌아가는 열차가 평소 운행이고, 팔당에서 돌아가는 열차는 열에 하나,
+        // 지평까지 가는 열차는 그보다 드물다. 수인분당선은 왕십리에서 돌아가고 청량리까지 가는 열차는 드물다.
+        val gyeongui = TestLines.bySlug("gyeongui")
+        val suinbundang = TestLines.bySlug("suinbundang")
 
         // when & then
-        train(line, "선릉", "왕십리")?.service shouldBe ServiceKind.NORMAL
-        train(line, "선릉", "청량리")?.service shouldBe ServiceKind.EXTENSION
-        train(line, "선릉", "죽전")?.service shouldBe ServiceKind.NORMAL
-        train(line, "선릉", "고색")?.service shouldBe ServiceKind.NORMAL
-        train(line, "선릉", "오이도")?.service shouldBe ServiceKind.SHORT
-        train(line, "선릉", "인천")?.service shouldBe ServiceKind.NORMAL
+        train(gyeongui, "청량리", "용문")?.service shouldBe ServiceKind.NORMAL
+        train(gyeongui, "청량리", "팔당")?.service shouldBe ServiceKind.SHORT
+        train(gyeongui, "청량리", "지평")?.service shouldBe ServiceKind.EXTENSION
+        train(suinbundang, "선릉", "왕십리")?.service shouldBe ServiceKind.NORMAL
+        train(suinbundang, "선릉", "청량리")?.service shouldBe ServiceKind.EXTENSION
+        train(suinbundang, "선릉", "인천")?.service shouldBe ServiceKind.NORMAL
     }
 
     "중간에서 돌아가는 열차가 양 끝까지 가는 열차만큼 많으면 그 역도 평소 종착역이다" {
-        // given - 7호선은 도봉산과 온수에서, 1호선은 청량리에서 돌아가는 열차가 늘 다닌다.
+        // given - 7호선은 도봉산과 온수에서, 1호선은 청량리에서, 수인분당선은 죽전, 고색, 오이도에서, 경의중앙선은
+        // 덕소에서 돌아가는 열차가 늘 다닌다. 수인분당선 오이도행은 인천과 오이도 사이만 오가는 열차다.
         // 그보다 드문 회차(7호선 수락산, 1호선 의정부와 구로)는 그 너머로 가는 사람이 타면 안 되므로 단축이다.
         val line7 = TestLines.bySlug("line7")
         val gyeongbu = TestLines.bySlug("line1-gyeongbu")
         val gyeongin = TestLines.bySlug("line1-gyeongin")
+        val suinbundang = TestLines.bySlug("suinbundang")
+        val gyeongui = TestLines.bySlug("gyeongui")
 
         // when & then
         train(line7, "고속터미널", "도봉산")?.service shouldBe ServiceKind.NORMAL
@@ -39,6 +44,10 @@ class ServiceKindTest : FreeSpec({
         train(gyeongin, "서울역", "청량리")?.service shouldBe ServiceKind.NORMAL
         train(gyeongbu, "금정", "구로")?.service shouldBe ServiceKind.SHORT
         train(gyeongin, "부평", "의정부")?.service shouldBe ServiceKind.SHORT
+        train(suinbundang, "선릉", "죽전")?.service shouldBe ServiceKind.NORMAL
+        train(suinbundang, "선릉", "고색")?.service shouldBe ServiceKind.NORMAL
+        train(suinbundang, "송도", "오이도")?.service shouldBe ServiceKind.NORMAL
+        train(gyeongui, "청량리", "덕소")?.service shouldBe ServiceKind.NORMAL
     }
 
     "형제 뷰의 종착역으로 가는 열차는 갈라지는 역을 향해 다른 계통으로 그린다" {

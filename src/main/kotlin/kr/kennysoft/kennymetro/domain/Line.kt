@@ -97,6 +97,15 @@ data class Line(
      * 구간의 끝이라 목록의 끝 역처럼 열차가 한쪽에서만 들어온다.
      */
     val noService: Set<String>,
+    /**
+     * 실시간 위치에 섞여 오는 다른 노선 열차의 번호 머리.
+     *
+     * <p>
+     * 수인분당선은 한대앞에서 오이도까지 4호선과 선로를 같이 쓰고, 그 구간의 오이도행 4호선 열차가
+     * 수인분당선 응답에 노선 코드와 역 코드까지 수인분당선 것으로 온다. 번호로만 알아볼 수 있다
+     * (DESIGN.md 2.2.1). 같은 열차는 4호선 뷰가 보여 준다.
+     */
+    val foreignTrainPrefixes: List<String>,
     /** 환승 문 파일 이름(`transfer/<이름>-doors.csv`). 지선마다 뷰를 둔 노선은 한 파일을 나눠 쓴다. */
     val transferFile: String,
 ) {
@@ -111,6 +120,9 @@ data class Line(
 
     /** 그 자리에 열차가 서는 역이 있는지. 목록 밖이거나 열차가 다니지 않는 역이면 false. */
     fun servedAt(index: Int): Boolean = index in stations.indices && stations[index] !in noService
+
+    /** 다른 노선 열차라 이 뷰에 그리지 않는지. */
+    fun isForeign(trainNo: String): Boolean = foreignTrainPrefixes.any { trainNo.startsWith(it) }
 
     /**
      * 열차가 그 자리에서 돌아갈 수 있는지. 목록의 끝, 열차가 다니지 않는 역의 바로 옆, 평소 종착역이다.

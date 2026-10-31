@@ -83,6 +83,11 @@ data class LineConfig(
      */
     val noService: List<String> = emptyList(),
     /**
+     * 실시간 위치에 섞여 오는 다른 노선 열차의 번호 머리. 이 번호로 시작하는 열차는 이 뷰에 그리지
+     * 않는다. 수인분당선 응답에 같은 선로를 쓰는 4호선 열차(4000번대)가 섞여 온다(DESIGN.md 2.2.1).
+     */
+    val foreignTrainPrefixes: List<String> = emptyList(),
+    /**
      * 환승 문 파일 이름(`transfer/<이름>-doors.csv`). 적지 않으면 slug 다. 지선마다 뷰를 둔
      * 노선은 원본 문서가 하나라 파일도 하나를 나눠 쓴다.
      */

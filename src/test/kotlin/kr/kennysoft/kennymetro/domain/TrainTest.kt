@@ -70,6 +70,21 @@ class TrainTest : FreeSpec({
         dto.toTrain(TestLines.shinbundang).shouldBeNull()
     }
 
+    "같은 선로를 쓰는 다른 노선 열차가 섞여 오면 제외한다" {
+        // given - 4647 은 2026-10-31 20:16 에 수인분당선 응답으로 온 오이도행 4호선 열차다. 수인분당선은 한대앞에서
+        // 오이도까지 4호선과 선로를 같이 쓴다. 수인분당선 열차는 6000번대이고, 버스 파업 때 더한 임시 열차는
+        // 코레일 시각표에 K9652 처럼 9000번대로 적혀 있다.
+        val suinbundang = TestLines.bySlug("suinbundang")
+        val line4Train = position(current = "초지", terminal = "오이도", updnLine = "1", trainNo = "4647")
+        val own = position(current = "초지", terminal = "인천", updnLine = "1", trainNo = "6557")
+        val extra = position(current = "송도", terminal = "오이도", updnLine = "0", trainNo = "9652")
+
+        // when & then - 남길 번호가 아니라 뺄 번호를 적는다. 6000번대만 남기면 임시 열차가 사라진다.
+        line4Train.toTrain(suinbundang).shouldBeNull()
+        own.toTrain(suinbundang)?.trainNo shouldBe "6557"
+        extra.toTrain(suinbundang)?.trainNo shouldBe "9652"
+    }
+
     "막차와 급행 표시를 옮긴다" {
         // given
         val dto = position(current = "판교", terminal = "광교", updnLine = "1", lstcarAt = "1", directAt = "1")
@@ -115,12 +130,13 @@ private fun position(
     lstcarAt: String = "0",
     directAt: String = "0",
     trainSttus: String = "1",
+    trainNo: String = "1",
 ) = TrainPositionDto(
     subwayId = "1077",
     subwayNm = "신분당선",
     statnId = "1077000000",
     statnNm = current,
-    trainNo = "1",
+    trainNo = trainNo,
     statnTid = "1077000001",
     statnTnm = terminal,
     updnLine = updnLine,

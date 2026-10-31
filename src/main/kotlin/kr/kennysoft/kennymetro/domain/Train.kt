@@ -98,10 +98,10 @@ sealed interface Recheck {
  * <p>
  * 열차가 돌아가는 역(`Line.turnsBackAt`)에서는 `updnLine` 이 직전 운행의 값이라 원래 어긋나므로
  * 보지 않는다. 한 방향으로만 다니는 역은 방향이 정해져 있고, 순환선은 종착역으로 방향을 정하지
- * 않으므로 대상이 아니다.
+ * 않으므로 대상이 아니다. 다른 노선 열차는 그리지 않으므로 다시 볼 것도 없다.
  */
 fun TrainPositionDto.needsRecheck(line: Line): Boolean {
-    if (line.circular || statnNm == statnTnm || statnNm in line.downOnly) return false
+    if (line.circular || statnNm == statnTnm || statnNm in line.downOnly || line.isForeign(trainNo)) return false
     val current = line.indexOf(statnNm) ?: return false
     if (line.turnsBackAt(current)) return false
     val destination = line.destinationOf(statnTnm) ?: return false
@@ -120,8 +120,11 @@ fun TrainPositionDto.needsRecheck(line: Line): Boolean {
  * <p>
  * 다만 노선 중간에서 두 값이 어긋나면 틀린 쪽은 종착역이다. `recheck` 는 그런 열차를 시간표로
  * 다시 본 결과이고, 이 뷰에서도 어긋날 때만 쓴다(`needsRecheck`).
+ * <p>
+ * 같은 선로를 쓰는 다른 노선의 열차(`Line.foreignTrainPrefixes`)도 제외한다. 그 노선의 뷰가 보여 준다.
  */
 fun TrainPositionDto.toTrain(line: Line, recheck: Recheck? = null): Train? {
+    if (line.isForeign(trainNo)) return null
     val currentIndex = line.indexOf(statnNm) ?: return null
     if (line.circular) return toCircularTrain(line)
     if (recheck == null || !needsRecheck(line)) return toLinearTrain(line, currentIndex, statnTnm)
