@@ -110,6 +110,13 @@ echo "$UISINSEOL" | grep -q '"trainNo":"1147","currentStation":"가오리","dest
 # 실시간 위치를 받을 곳이 없는 노선. 불려도 아무 데도 호출하지 않고 빈 목록을 준다. 아래 호출 수가 이것을 함께 본다.
 INCHEON=$(curl -sf "$BASE/api/lines/incheon1/trains") || fail "인천1호선 열차 목록을 받지 못했다"
 echo "$INCHEON" | grep -q '"trains":\[\]' || fail "실시간 위치가 없는 노선이 빈 목록이 아니다: $INCHEON"
+# 광명셔틀이 실시간 위치에 오지 않는 금천구청과 광명 사이에서는 역별 시간표로 자리를 계산해 그린다
+# (DESIGN.md 2.2.3). stub 의 시간표에서 셔틀 7012 는 2분 전에 광명을 떠났다. 같은 선로를 지나는 실시간
+# 열차는 시간표로 그린 열차가 아니다.
+SHUTTLE=$(curl -sf "$BASE/api/lines/line1-gwangmyeong/trains") || fail "광명셔틀 열차 목록을 받지 못했다"
+echo "$SHUTTLE" | grep -q '"trainNo":"7012","currentStation":"광명","destination":"영등포","direction":"UP"[^}]*"status":"DEPARTED"[^}]*"scheduled":true' \
+  || fail "광명셔틀을 시간표로 그리지 못했다: $SHUTTLE"
+echo "$SHUTTLE" | grep -q '"trainNo":"0707"[^}]*"scheduled":false' || fail "실시간 열차가 응답에 없다: $SHUTTLE"
 
 # 환승 데이터는 classpath 리소스라 native image 에 자동으로 실리지 않는다. 힌트를 빠뜨리면
 # JVM 에서는 멀쩡히 읽히고 바이너리에서만 파일이 없는 것처럼 빈 목록이 된다.
@@ -156,12 +163,13 @@ anchors = views["line1-gyeongbu"]["anchors"]
 sys.exit(0 if anchors.get("인천") == "구로" and anchors.get("서동탄") == "병점" else 1)
 ' || fail "경부 뷰의 갈라지는 역이 응답에 없다: $LINES"
 
-# 호출 원장. 위 trains 요청으로 서울시 API 를 여섯 번 불렀으니 그것이 파일에 남아야 한다. 실시간
-# 위치가 세 노선에 한 번씩, 3423 을 다시 보느라 역 코드 한 번과 평일 시간표 상하행 두 번이다.
+# 호출 원장. 위 trains 요청으로 서울시 API 를 스물여덟 번 불렀으니 그것이 파일에 남아야 한다. 실시간
+# 위치가 네 노선에 한 번씩, 3423 을 다시 보느라 역 코드 한 번과 시간표 상하행 두 번, 광명셔틀을
+# 그리느라 일곱 역의 역 코드 일곱 번과 시간표 상하행 열네 번이다.
 # 재배포해도 예산 표시가 이어지게 하는 장치라 실제로 파일이 생기는지까지 본다.
-echo "$LINES" | grep -q '"apiCallCount":6' || fail "호출 수가 응답에 없다: $LINES"
+echo "$LINES" | grep -q '"apiCallCount":28' || fail "호출 수가 응답에 없다: $LINES"
 [ -f "$LEDGER" ] || fail "호출 원장 파일이 생기지 않았다: $LEDGER"
-grep -q "^$DAY_BEFORE 6$" "$LEDGER" || fail "오늘 호출 수가 원장에 없다: $(cat "$LEDGER")"
+grep -q "^$DAY_BEFORE 28$" "$LEDGER" || fail "오늘 호출 수가 원장에 없다: $(cat "$LEDGER")"
 
 # favicon 은 XML 이라 주석에 붙임표 두 개만 들어가도 브라우저가 렌더링을 거부한다.
 # 인라인으로 넣어 보면 HTML 파서가 관대해서 그냥 지나가므로 파일 그대로 파싱해 본다.
@@ -189,10 +197,10 @@ BODY=$(curl -sf "$BASE/api/lines/shinbundang/trains") || fail "빈 목록 응답
 echo "$BODY" | grep -q '"trains":\[\]' || fail "빈 목록이 아니다: $BODY"
 echo "$BODY" | grep -q '"line":"shinbundang"' || fail "노선 표시가 빠졌다: $BODY"
 
-# 앱을 껐다 켰으므로 호출 수는 6 에서 이어져 7 이어야 한다. 원장을 안 읽으면 여기서 1 이 된다.
+# 앱을 껐다 켰으므로 호출 수는 28 에서 이어져 29 여야 한다. 원장을 안 읽으면 여기서 1 이 된다.
 LINES=$(curl -sf "$BASE/api/lines") || fail "노선 목록을 받지 못했다"
 if [ "$(date '+%Y-%m-%d')" = "$DAY_BEFORE" ]; then
-  echo "$LINES" | grep -q '"apiCallCount":7' || fail "재기동 후 호출 수를 이어받지 못했다: $LINES"
+  echo "$LINES" | grep -q '"apiCallCount":29' || fail "재기동 후 호출 수를 이어받지 못했다: $LINES"
 else
   echo "  자정을 넘겨 이어받기 확인은 건너뛴다"
 fi

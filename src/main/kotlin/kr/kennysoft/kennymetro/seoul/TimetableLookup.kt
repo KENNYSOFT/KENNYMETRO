@@ -3,6 +3,9 @@ package kr.kennysoft.kennymetro.seoul
 import kr.kennysoft.kennymetro.domain.Line
 import kr.kennysoft.kennymetro.domain.LineCatalog
 import kr.kennysoft.kennymetro.domain.Recheck
+import kr.kennysoft.kennymetro.domain.ScheduledStop
+import kr.kennysoft.kennymetro.domain.ScheduledTrip
+import kr.kennysoft.kennymetro.domain.StationNames
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import java.time.Clock
@@ -16,7 +19,8 @@ import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.abs
 
 /**
- * 종착역을 믿을 수 없는 열차를 그 역의 시간표에서 찾는다(DESIGN.md 2.2.2).
+ * 종착역을 믿을 수 없는 열차를 그 역의 시간표에서 찾는다(DESIGN.md 2.2.2). 실시간 위치가 빠지는
+ * 구간을 달리는 열차의 자리도 시간표로 계산한다(DESIGN.md 2.2.3).
  *
  * <p>
  * 어긋나는 열차가 나올 때만 부른다. 한 번 받은 역 코드와 시간표는 하루 동안 다시 부르지 않고,
@@ -45,6 +49,25 @@ class TimetableLookup(
             line.apiName, train.trainNo, train.statnNm, train.statnTnm, train.updnLine, result,
         )
         return result
+    }
+
+    /**
+     * 실시간 위치가 빠지는 구간이 있는 열차의 그 날 운행(DESIGN.md 2.2.3).
+     *
+     * <p>
+     * 그 뷰의 역마다 그 요일의 상하행 시간표를 받아, `scheduledTerminals` 에서 출발하거나 거기서 끝나는
+     * 운행을 역마다 이어 붙인다. 한 역이라도 받지 못하면 비운다 - 빠진 역을 건너뛰면 역 사이 소요시간이
+     * 틀린다. 공휴일 달력을 두지 않으므로 평일인 공휴일에는 평일 시간표를 쓴다.
+     */
+    internal fun findScheduledTrips(line: Line, time: ServiceTime): List<ScheduledTrip> {
+        if (line.scheduledTerminals.isEmpty()) return emptyList()
+        val timetableLine = line.timetableLine ?: return emptyList()
+        val weekTag = time.weekTags.first()
+        val rows = line.stations.filter { it !in line.noService }.associateWith { station ->
+            val code = stationCode(timetableLine, station) ?: return emptyList()
+            INOUT_TAGS.flatMap { inoutTag -> timetable(code, weekTag, inoutTag) ?: return emptyList() }
+        }
+        return rows.toTrips(line.scheduledTerminals, catalog.stationNames)
     }
 
     private fun find(line: Line, train: TrainPositionDto): TimetableRow? {
@@ -153,6 +176,34 @@ internal fun List<TimetableRow>.findTrain(trainNo: String, seconds: Int): Timeta
 }
 
 private const val MATCH_WINDOW_SECONDS = 30 * 60
+
+/**
+ * 역마다 받은 시간표에서 `terminals` 에서 출발하거나 거기서 끝나는 운행을 골라 역을 이어 붙인다.
+ *
+ * <p>
+ * 같은 열차번호의 줄이 그 운행이 서는 역마다 하나씩 있어, 시각 순서로 세우면 서는 역의 순서가 된다.
+ * 열차번호는 실시간 표기에 맞춰 숫자만 4자리로 적는다(`K7032` 는 `7032`). 같은 시발역과 종착역으로
+ * 다니는 운행 가운데 가장 늦게 떠나는 것이 막차다.
+ */
+internal fun Map<String, List<TimetableRow>>.toTrips(terminals: Set<String>, names: StationNames): List<ScheduledTrip> {
+    val legs = flatMap { (station, rows) -> rows.map { station to it } }
+        .filter { (_, row) -> names.normalize(row.origin) in terminals || names.normalize(row.terminal) in terminals }
+    val runs = legs.groupBy { (_, row) -> row.trainNo }.mapNotNull { (trainNo, legs) ->
+        val stops = legs.map { (station, row) -> ScheduledStop(station, row.arriveTime.toSeconds(), row.leftTime.toSeconds()) }
+            .filter { it.arrive != null || it.depart != null }
+            .distinctBy { it.station }
+            .sortedBy { it.arrive ?: it.depart }
+        val row = legs.first().second
+        ScheduledRun(trainNo, names.normalize(row.origin), names.normalize(row.terminal), stops).takeIf { stops.size >= 2 }
+    }
+    val last = runs.groupBy { it.origin to it.terminal }.values.map { same -> same.maxBy { it.start }.trainNo }.toSet()
+    return runs.map { ScheduledTrip(it.trainNo.filter(Char::isDigit).padStart(4, '0'), it.terminal, it.trainNo in last, it.stops) }
+}
+
+/** 시간표 번호 그대로의 운행. 막차를 알아보려고 시발역을 함께 든다. */
+private data class ScheduledRun(val trainNo: String, val origin: String, val terminal: String, val stops: List<ScheduledStop>) {
+    val start: Int get() = stops.first().let { it.depart ?: it.arrive ?: 0 }
+}
 
 /** 이 역의 도착 또는 출발 시각과 벌어진 초. 두 시각이 모두 비었으면 null 이다. */
 private fun TimetableRow.gapFrom(seconds: Int): Int? =

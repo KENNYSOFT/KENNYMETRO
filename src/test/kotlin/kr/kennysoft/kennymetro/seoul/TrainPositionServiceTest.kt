@@ -9,6 +9,7 @@ import io.kotest.matchers.shouldBe
 import kr.kennysoft.kennymetro.TestLines
 import kr.kennysoft.kennymetro.domain.Direction
 import kr.kennysoft.kennymetro.domain.ServiceKind
+import kr.kennysoft.kennymetro.domain.TrainStatus
 import kr.kennysoft.kennymetro.everline.EverlineClient
 import kr.kennysoft.kennymetro.everline.EverlineProperties
 import java.time.Duration
@@ -157,6 +158,90 @@ class TrainPositionServiceTest : FreeSpec({
 
         // then - 실시간 1회, 역 코드 1회, 평일과 휴일의 상하행 4회.
         service.apiCallCount() shouldBe 6
+    }
+
+    /** 광명셔틀 뷰의 역마다 역 코드를 두고, 10:48 에 광명을 떠나 영등포로 가는 7012 를 시간표에 적는다. 시각은 예로 든 값이다. */
+    fun shuttleTimetable() {
+        listOf("영등포", "신도림", "구로", "가산디지털단지", "독산", "금천구청", "광명").forEachIndexed { i, name ->
+            timetables.stations[name] = listOf(StationRow("S$i", name, "01호선"))
+        }
+        timetables.rows[Triple("S6", "1", "1")] = listOf(TimetableRow("K7012", "00:00:00", "10:48:00", "광명", "영등포"))
+        timetables.rows[Triple("S5", "1", "1")] = listOf(TimetableRow("K7012", "10:52:30", "10:53:00", "광명", "영등포"))
+        timetables.rows[Triple("S0", "1", "1")] = listOf(TimetableRow("K7012", "11:05:00", "00:00:00", "광명", "영등포"))
+    }
+
+    "실시간 위치에 없는 광명셔틀은 시간표로 받은 시각의 자리에 그린다" {
+        // given - 수요일 10:50 에 받는다. 7012 는 광명을 2분 전에 떠나 실시간 위치가 오지 않는 금천구청 앞을 달린다.
+        seoul.next = listOf(position("0643", "구로", "천안"))
+        shuttleTimetable()
+        val service = service()
+
+        // when
+        val trains = service.snapshot(TestLines.bySlug("line1-gwangmyeong")).trains
+
+        // then - 화면이 역 사이에 놓도록 떠난 뒤 흐른 초와 다음 역까지 걸리는 초를 함께 준다.
+        val shuttle = trains.single { it.trainNo == "7012" }
+        shuttle.currentStation shouldBe "광명"
+        shuttle.destination shouldBe "영등포"
+        shuttle.direction shouldBe Direction.UP
+        shuttle.status shouldBe TrainStatus.DEPARTED
+        shuttle.elapsedSeconds shouldBe 120
+        shuttle.segmentSeconds shouldBe 270
+        shuttle.scheduled shouldBe true
+        trains.single { it.trainNo == "0643" }.scheduled shouldBe false
+    }
+
+    "시간표로 그리던 열차가 실시간 위치에 오면 실시간 쪽을 쓴다" {
+        // given - 같은 번호가 실시간 위치에 왔다.
+        seoul.next = listOf(position("7012", "금천구청", "영등포", updnLine = "0"))
+        shuttleTimetable()
+
+        // when
+        val trains = service().snapshot(TestLines.bySlug("line1-gwangmyeong")).trains
+
+        // then - 한 대가 두 대로 보이지 않는다.
+        trains shouldHaveSize 1
+        trains.single().currentStation shouldBe "금천구청"
+        trains.single().scheduled shouldBe false
+    }
+
+    "광명 바로 앞 역에 멈춘 실시간 기록은 버리고 시간표의 자리를 그린다" {
+        // given - 영등포에서 광명으로 가는 7011 이 10:48 에 금천구청을 떠났다. 금천구청과 광명 사이에서는 실시간
+        // 위치가 오지 않아 금천구청에서 받은 기록이 그대로 남아 있다. 시각은 예로 든 값이다.
+        shuttleTimetable()
+        timetables.rows[Triple("S0", "1", "2")] = listOf(TimetableRow("K7011", "00:00:00", "10:38:00", "영등포", "광명"))
+        timetables.rows[Triple("S5", "1", "2")] = listOf(TimetableRow("K7011", "10:47:30", "10:48:00", "영등포", "광명"))
+        timetables.rows[Triple("S6", "1", "2")] = listOf(TimetableRow("K7011", "10:53:00", "00:00:00", "영등포", "광명"))
+        seoul.next = listOf(position("7011", "금천구청", "광명", receivedAt = "2026-09-23 10:47:40"))
+        val service = service()
+        val line = TestLines.bySlug("line1-gwangmyeong")
+
+        // when - 10:50 에 받고, 시간표로 광명에 닿은 뒤인 10:54 에 다시 받는다. 기록은 그대로다.
+        val running = service.snapshot(line).trains
+        clock.advance(Duration.ofMinutes(4))
+        val arrived = service.snapshot(line).trains
+
+        // then - 달리는 동안은 시간표의 자리로 광명 쪽에 다가가고, 닿은 뒤에는 그리지 않는다.
+        val shuttle = running.single { it.trainNo == "7011" }
+        shuttle.scheduled shouldBe true
+        shuttle.currentStation shouldBe "금천구청"
+        shuttle.status shouldBe TrainStatus.DEPARTED
+        shuttle.elapsedSeconds shouldBe 120
+        shuttle.segmentSeconds shouldBe 300
+        arrived.none { it.trainNo == "7011" } shouldBe true
+    }
+
+    "시간표를 받지 못하면 셔틀만 빠지고 실시간 열차는 그대로 그린다" {
+        // given
+        seoul.next = listOf(position("0643", "구로", "천안"))
+        shuttleTimetable()
+        timetables.failure = IllegalStateException("시간표 조회 실패")
+
+        // when
+        val trains = service().snapshot(TestLines.bySlug("line1-gwangmyeong")).trains
+
+        // then
+        trains.map { it.trainNo } shouldBe listOf("0643")
     }
 })
 

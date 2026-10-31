@@ -15,6 +15,8 @@ import kr.kennysoft.kennymetro.seoul.TrainPositionDto
  * @param elapsedSeconds 그 상태가 된 뒤 흐른 초. 용인경전철만 준다.
  * @param segmentSeconds 떠난 역에서 다음 역까지 걸리는 초. 용인경전철이 달리는 중일 때만 있다. 화면은
  *                       흐른 초를 이것으로 나눠 역 사이 어디쯤인지 그린다.
+ * @param scheduled 실시간 위치가 아니라 시간표로 자리를 계산한 열차인지. 실시간 위치가 빠지는 구간을 달리는
+ *                  광명셔틀만 그렇다(DESIGN.md 2.2.3). 화면은 시간표로 그린 열차라고 적는다.
  */
 data class Train(
     val trainNo: String,
@@ -28,6 +30,7 @@ data class Train(
     val status: TrainStatus?,
     val elapsedSeconds: Int?,
     val segmentSeconds: Int?,
+    val scheduled: Boolean,
 )
 
 enum class Direction {
@@ -158,6 +161,7 @@ private fun TrainPositionDto.toLinearTrain(line: Line, currentIndex: Int, termin
         status = status(),
         elapsedSeconds = null,
         segmentSeconds = null,
+        scheduled = false,
     )
 }
 
@@ -177,6 +181,7 @@ private fun TrainPositionDto.toTrainWithoutDestination(line: Line) = Train(
     status = status(),
     elapsedSeconds = null,
     segmentSeconds = null,
+    scheduled = false,
 )
 
 /**
@@ -213,5 +218,6 @@ private fun TrainPositionDto.toCircularTrain(line: Line): Train? {
         status = status(),
         elapsedSeconds = null,
         segmentSeconds = null,
+        scheduled = false,
     )
 }

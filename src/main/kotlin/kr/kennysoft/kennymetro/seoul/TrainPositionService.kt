@@ -4,6 +4,7 @@ import kr.kennysoft.kennymetro.domain.Line
 import kr.kennysoft.kennymetro.domain.LineCatalog
 import kr.kennysoft.kennymetro.domain.LineSource
 import kr.kennysoft.kennymetro.domain.Recheck
+import kr.kennysoft.kennymetro.domain.ScheduledPosition
 import kr.kennysoft.kennymetro.domain.Train
 import kr.kennysoft.kennymetro.domain.needsRecheck
 import kr.kennysoft.kennymetro.domain.tidy
@@ -15,6 +16,7 @@ import org.springframework.stereotype.Service
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
+import java.time.LocalDateTime
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.locks.ReentrantLock
 
@@ -114,7 +116,11 @@ class TrainPositionService(
             val raw = seoulClient.findPositions(line.apiName).tidy(catalog.stationNames)
             reportUnknown(line, raw.flatMap { listOf(it.statnNm, it.statnTnm) })
             val rechecks = recheck(line, raw)
-            Positions(raw.size) { view -> raw.mapNotNull { it.toTrain(view, rechecks[it.trainNo]) } }
+            val scheduled = placeScheduled(line, raw)
+            val live = raw.filter { it.trainNo !in scheduled.stale }
+            Positions(raw.size) { view ->
+                live.mapNotNull { it.toTrain(view, rechecks[it.trainNo]) } + scheduled.positions.mapNotNull { it.toTrain(view) }
+            }
         }
 
         LineSource.EVERLINE -> {
@@ -138,6 +144,34 @@ class TrainPositionService(
         return raw.filter { train -> views.any { train.needsRecheck(it) } }
             .associate { it.trainNo to timetable.recheck(line, it) }
     }
+
+    /**
+     * 실시간 위치가 빠지는 구간을 달리는 열차를 시간표로 받은 시각의 자리에 놓는다(DESIGN.md 2.2.3).
+     *
+     * <p>
+     * 같은 API 노선의 뷰 가운데 `scheduledTerminals` 를 적은 뷰의 역 시간표로 계산하고, 다른 뷰도 그 운행을
+     * 자기 역 목록으로 옮겨 그린다. 받은 시각의 자리라 화면은 실시간 열차처럼 "N초 전 기준" 으로 읽는다.
+     * 실시간 위치에 같은 번호가 있으면 늦게 다니는 것까지 보이는 그쪽을 쓴다. 다만 종착역 바로 앞 역에
+     * 멈춘 기록이면 버리고 시간표의 자리를 쓴다(`ScheduledTrip.isStaleAt`).
+     */
+    private fun placeScheduled(line: Line, raw: List<TrainPositionDto>): Scheduled {
+        val time = ServiceTime.of(LocalDateTime.now(clock))
+        val live = raw.associateBy { it.trainNo }
+        val positions = mutableListOf<ScheduledPosition>()
+        val stale = mutableSetOf<String>()
+        catalog.all().filter { it.cacheKey == line.cacheKey }.forEach { view ->
+            timetable.findScheduledTrips(view, time).forEach { trip ->
+                val record = live[trip.trainNo]
+                if (record != null && trip.isStaleAt(record.statnNm, time.seconds, view.scheduledTerminals)) stale += trip.trainNo
+                val position = trip.positionAt(time.seconds) ?: return@forEach
+                if (record == null || trip.trainNo in stale) positions += position
+            }
+        }
+        return Scheduled(positions, stale)
+    }
+
+    /** 시간표로 놓은 열차와, 그 대신 버릴 멈춘 실시간 기록의 열차번호. */
+    private class Scheduled(val positions: List<ScheduledPosition>, val stale: Set<String>)
 
     /**
      * 우리가 모르는 역명을 한 번씩 로그로 남긴다.

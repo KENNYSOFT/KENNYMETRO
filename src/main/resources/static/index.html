@@ -162,6 +162,8 @@
     font-size: 10px; font-weight: 700; line-height: 1; padding: 3px 4px; border-radius: 3px;
   }
   .train .tag { font-size: 11px; font-weight: 600; color: var(--warn-fg); }
+  /* 시간표로 자리를 계산한 열차. 운행 범위 표시(배경)와 겹쳐도 읽히도록 글로 적는다. */
+  .train .sched { font-size: 11px; color: var(--muted); }
   /* 차수 색은 왼쪽 막대로만 쓴다. 칩 배경을 물들이면 운행 범위 표시와 겹친다. */
   .train.fleet { border-left: 3px solid var(--fleet); padding-left: 5px; }
   .train.short { background: var(--warn-bg); color: var(--warn-fg); font-weight: 600; }
@@ -856,15 +858,18 @@ function trainChip(line, t, at, fetched) {
   if (kind) title.push(kind.label + ': ' + kind.note);
   // 실시간 종착역이 진행 방향과 어긋나고 시간표로도 찾지 못한 열차. 방향만 믿을 수 있다.
   if (t.destination == null) title.push('행선지 불명: 실시간 정보의 종착역이 진행 방향과 맞지 않습니다');
+  // 실시간 위치가 오지 않는 구간이라 시간표로 자리를 계산한 열차(광명셔틀). 늦게 다녀도 화면은 모른다.
+  if (t.scheduled) title.push('시간표 기준: 이 구간에서는 실시간 위치가 오지 않아 시간표로 자리를 계산했습니다');
   if (t.isExpress) chip.appendChild(el('span', 'exp', '급행'));
   chip.appendChild(el('span', 'dst', t.destination == null ? '행선지 불명' : t.destination + '행'));
   if (t.isLastTrain) chip.appendChild(el('span', 'tag', '막차'));
+  if (t.scheduled) chip.appendChild(el('span', 'sched', '시간표'));
   chip.appendChild(el('span', 'no', t.trainNo));
   if (title.length) chip.title = title.join('\n');
   return chip;
 }
 
-/** 지금 그려진 열차에 있는 운행 종류만 범례로 적는다. */
+/** 지금 그려진 열차에 있는 운행 종류만 범례로 적는다. 시간표로 그린 열차가 있으면 그것도 적는다. */
 function renderKinds(section, trains) {
   const box = section.querySelector('.kinds');
   if (!box) return;
@@ -875,6 +880,15 @@ function renderKinds(section, trains) {
     const item = el('span');
     item.appendChild(el('span', 'train ' + kind.cls, kind.label));
     item.appendChild(document.createTextNode(' ' + kind.note));
+    box.appendChild(item);
+  }
+  // 운행 종류와 따로 적는다. 평소 운행이어도 실시간 위치가 아니라는 것은 알아야 한다.
+  if (trains.some(t => t.scheduled)) {
+    const item = el('span');
+    const sample = el('span', 'train');
+    sample.appendChild(el('span', 'sched', '시간표'));
+    item.appendChild(sample);
+    item.appendChild(document.createTextNode(' 실시간 위치가 오지 않는 구간이라 시간표로 자리를 계산한 열차입니다'));
     box.appendChild(item);
   }
   box.hidden = box.children.length === 0;

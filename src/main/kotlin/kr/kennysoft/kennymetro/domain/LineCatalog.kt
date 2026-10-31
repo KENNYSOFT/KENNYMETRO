@@ -111,6 +111,11 @@ class LineCatalog(properties: MetroProperties) {
         noService.forEach { indexOrFail(it, "no-service") }
         // 빈 머리는 모든 번호에 맞아 그 노선의 열차가 통째로 사라진다.
         require(foreignTrainPrefixes.none { it.isBlank() }) { "$slug: foreign-train-prefixes 에 빈 값이 있다: $foreignTrainPrefixes" }
+        scheduledTerminals.forEach { indexOrFail(it, "scheduled-terminals") }
+        // 서울시 역별 시간표로 자리를 계산하므로 그 시간표가 있는 노선이어야 한다.
+        require(scheduledTerminals.isEmpty() || (apiName ?: name) in timetableLines) {
+            "$slug: scheduled-terminals 는 timetable-lines 에 있는 노선에만 적을 수 있다"
+        }
         // 노선 순서와 반대로 적어도 되게 한다. 2호선 관심 구간이 강남에서 잠실인데
         // 역 순서로는 잠실이 앞이다.
         val bounds = focus.map { indexOrFail(it, "focus") }.sorted()
@@ -148,6 +153,7 @@ class LineCatalog(properties: MetroProperties) {
             downOnly = downOnly.toSet(),
             noService = noService.toSet(),
             foreignTrainPrefixes = foreignTrainPrefixes,
+            scheduledTerminals = scheduledTerminals.toSet(),
             transferFile = transferFile ?: slug,
         )
     }

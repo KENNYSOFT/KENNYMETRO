@@ -88,6 +88,12 @@ data class LineConfig(
      */
     val foreignTrainPrefixes: List<String> = emptyList(),
     /**
+     * 실시간 위치가 빠지는 구간이 있어 역별 시간표로 자리를 계산해 그리는 열차의 시발역이나 종착역. 시간표에서
+     * 이 역에서 출발하거나 이 역에서 끝나는 운행을 이 뷰의 역마다 따라간다. 광명셔틀은 금천구청과 광명
+     * 사이에서 실시간 위치에 오지 않는다(DESIGN.md 2.2.3).
+     */
+    val scheduledTerminals: List<String> = emptyList(),
+    /**
      * 환승 문 파일 이름(`transfer/<이름>-doors.csv`). 적지 않으면 slug 다. 지선마다 뷰를 둔
      * 노선은 원본 문서가 하나라 파일도 하나를 나눠 쓴다.
      */

@@ -119,6 +119,7 @@ fun EverlineTrainDto.toTrain(line: Line): Train? {
         status = status,
         elapsedSeconds = time.toIntOrNull(),
         segmentSeconds = if (status == TrainStatus.DEPARTED) segmentSeconds(currentIndex, direction) else null,
+        scheduled = false,
     )
 }
 

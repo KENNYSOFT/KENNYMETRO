@@ -222,6 +222,55 @@ class LineCatalogTest : FreeSpec({
         error.message shouldContain "foreign-train-prefixes"
     }
 
+    "시간표로 그릴 열차의 시발역이나 종착역이 노선에 없으면 기동이 실패한다" {
+        // given - 역명 오타로 조용히 빠지면 시간표로 그리려던 열차가 하나도 나오지 않는다.
+        val broken = MetroProperties(
+            listOf(
+                LineConfig(
+                    slug = "test",
+                    name = "테스트선",
+                    color = "#000000",
+                    source = LineSource.SEOUL,
+                    upLabel = "위",
+                    downLabel = "아래",
+                    stations = listOf("가", "나"),
+                    scheduledTerminals = listOf("없는역"),
+                )
+            ),
+            timetableLines = mapOf("테스트선" to "01호선"),
+        )
+
+        // when
+        val error = shouldThrow<IllegalStateException> { LineCatalog(broken) }
+
+        // then - 어느 설정이 틀렸는지 알려야 한다.
+        error.message shouldContain "scheduled-terminals"
+    }
+
+    "역별 시간표가 없는 노선에 시간표로 그릴 열차를 적으면 기동이 실패한다" {
+        // given - 시간표를 부르지 않는 노선이라 적어 둔 열차가 하나도 나오지 않는다.
+        val broken = MetroProperties(
+            listOf(
+                LineConfig(
+                    slug = "test",
+                    name = "테스트선",
+                    color = "#000000",
+                    source = LineSource.SEOUL,
+                    upLabel = "위",
+                    downLabel = "아래",
+                    stations = listOf("가", "나"),
+                    scheduledTerminals = listOf("가"),
+                )
+            )
+        )
+
+        // when
+        val error = shouldThrow<IllegalArgumentException> { LineCatalog(broken) }
+
+        // then - 어느 설정이 틀렸는지 알려야 한다.
+        error.message shouldContain "scheduled-terminals"
+    }
+
     "대괄호를 빠뜨려 키가 지워진 역명 치환은 기동이 실패한다" {
         // given - relaxed binding 이 한글 키를 지우면 빈 키가 된다. 조용히 넘어가면 그 역의 열차가 사라진다.
         val broken = MetroProperties(

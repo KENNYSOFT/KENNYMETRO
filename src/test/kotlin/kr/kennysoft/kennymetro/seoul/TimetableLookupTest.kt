@@ -77,6 +77,28 @@ class TimetableLookupTest : FreeSpec({
         arriving.findTrain("4302", seconds("24:58:00"))?.trainNo shouldBe "4302"
     }
 
+    "광명에서 출발하거나 광명에서 끝나는 운행만 골라 역을 이어 붙이고 실시간 표기의 번호를 단다" {
+        // given - 역마다 받은 시간표에는 그 역에 서는 1호선 열차가 모두 있다. 시각은 예로 든 값이다.
+        val rows = mapOf(
+            "광명" to listOf(shuttle("K7032", "00:00:00", "20:09:00"), shuttle("K7040", "00:00:00", "23:39:00")),
+            "금천구청" to listOf(
+                shuttle("K7032", "20:13:30", "20:14:00"),
+                shuttle("K7040", "23:43:30", "23:44:00"),
+                TimetableRow("K1601", "20:10:00", "20:10:30", "서울", "천안"),
+            ),
+            "영등포" to listOf(shuttle("K7032", "20:26:00", "00:00:00"), shuttle("K7040", "23:56:00", "00:00:00")),
+        )
+
+        // when
+        val trips = rows.toTrips(setOf("광명"), TestLines.catalog.stationNames)
+
+        // then - 천안행은 광명을 오가지 않아 빠지고, 그 날 마지막으로 광명을 떠나는 7040 이 막차다.
+        trips.map { it.trainNo } shouldBe listOf("7032", "7040")
+        trips.first().stops.map { it.station } shouldBe listOf("광명", "금천구청", "영등포")
+        trips.first().terminal shouldBe "영등포"
+        trips.map { it.isLast } shouldBe listOf(false, true)
+    }
+
     "한 번 받은 역 코드와 시간표는 다시 부르지 않는다" {
         // given
         client.rows[Triple("0322", "1", "2")] = listOf(row("3423", "24:58:30", "24:59:00", terminal = "약수"))
@@ -144,5 +166,9 @@ private fun glitch() = TrainPositionDto(
 
 private fun row(trainNo: String, arrive: String, leave: String, terminal: String = "오금") =
     TimetableRow(trainNo = trainNo, arriveTime = arrive, leftTime = leave, origin = "대화", terminal = terminal)
+
+/** 광명을 떠나 영등포로 가는 셔틀의 한 역 줄. */
+private fun shuttle(trainNo: String, arrive: String, leave: String) =
+    TimetableRow(trainNo = trainNo, arriveTime = arrive, leftTime = leave, origin = "광명", terminal = "영등포")
 
 private fun seconds(time: String): Int = time.split(":").map { it.toInt() }.let { (h, m, s) -> h * 3600 + m * 60 + s }
