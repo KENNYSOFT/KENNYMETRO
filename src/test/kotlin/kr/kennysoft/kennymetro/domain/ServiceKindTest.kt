@@ -14,8 +14,10 @@ class ServiceKindTest : FreeSpec({
     "평소 종착역보다 먼저 끝나면 단축이고 더 가면 연장이다" {
         // given - 경의중앙선 동쪽은 용문에서 돌아가는 열차가 평소 운행이고, 팔당에서 돌아가는 열차는 열에 하나,
         // 지평까지 가는 열차는 그보다 드물다. 수인분당선은 왕십리에서 돌아가고 청량리까지 가는 열차는 드물다.
+        // 경춘선은 상봉에서 돌아가는 열차가 열에 여덟이고 청량리까지 가는 열차가 열에 둘이다.
         val gyeongui = TestLines.bySlug("gyeongui")
         val suinbundang = TestLines.bySlug("suinbundang")
+        val gyeongchun = TestLines.bySlug("gyeongchun")
 
         // when & then
         train(gyeongui, "청량리", "용문")?.service shouldBe ServiceKind.NORMAL
@@ -24,6 +26,9 @@ class ServiceKindTest : FreeSpec({
         train(suinbundang, "선릉", "왕십리")?.service shouldBe ServiceKind.NORMAL
         train(suinbundang, "선릉", "청량리")?.service shouldBe ServiceKind.EXTENSION
         train(suinbundang, "선릉", "인천")?.service shouldBe ServiceKind.NORMAL
+        train(gyeongchun, "망우", "상봉")?.service shouldBe ServiceKind.NORMAL
+        train(gyeongchun, "망우", "청량리")?.service shouldBe ServiceKind.EXTENSION
+        train(gyeongchun, "상봉", "마석")?.service shouldBe ServiceKind.SHORT
     }
 
     "중간에서 돌아가는 열차가 양 끝까지 가는 열차만큼 많으면 그 역도 평소 종착역이다" {
