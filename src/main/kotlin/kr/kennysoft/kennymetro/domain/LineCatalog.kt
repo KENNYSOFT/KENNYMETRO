@@ -17,7 +17,9 @@ import kotlin.math.abs
 @Component
 class LineCatalog(properties: MetroProperties) {
 
-    private val lines: List<Line> = withSiblingAnchors(properties.lines.map { it.toLine(properties.timetableLines) })
+    private val lines: List<Line> = withSiblingAnchors(properties.lines.map { it.toLine(properties) })
+    private val trainKinds: Map<String, TrainKind> =
+        properties.trainKinds.mapValues { (_, kind) -> TrainKind(kind.color, kind.separateTicket, kind.note) }
     private val bySlug: Map<String, Line> = lines.associateBy { it.slug }
     private val colors: Map<String, String> = properties.transferColors
     private val preset: List<String> = properties.preset
@@ -54,9 +56,20 @@ class LineCatalog(properties: MetroProperties) {
                 "timetable-lines 가 서울시 API 로 받는 노선이 아닌 것을 가리킨다: $name"
             }
         }
+        trainKinds.forEach { (name, kind) ->
+            require(name.isNotBlank()) { "train-kinds 의 키가 비었다. 키를 대괄호로 감쌌는지 볼 것: ${trainKinds.keys}" }
+            require(HEX_COLOR.matches(kind.color)) { "train-kinds 의 $name 색이 #rrggbb 가 아니다: ${kind.color}" }
+            // 화면은 이 열차를 운행 종류 대신 범례의 이 설명으로 알린다.
+            require(!kind.separateTicket || !kind.note.isNullOrBlank()) {
+                "train-kinds 의 $name 은 승차권을 따로 끊는 열차라 범례에 적을 note 가 있어야 한다"
+            }
+        }
     }
 
     fun all(): List<Line> = lines
+
+    /** 열차에 붙이는 종류와 그 색. 화면이 열차의 `kind` 를 이것으로 그린다. */
+    fun trainKinds(): Map<String, TrainKind> = trainKinds
 
     /** 아직 아무것도 고르지 않은 브라우저에 보여줄 노선과 그 순서. */
     fun preset(): List<String> = preset.ifEmpty { lines.map { it.slug } }
@@ -91,7 +104,8 @@ class LineCatalog(properties: MetroProperties) {
 
     fun bySlug(slug: String): Line? = bySlug[slug]
 
-    private fun LineConfig.toLine(timetableLines: Map<String, String>): Line {
+    private fun LineConfig.toLine(properties: MetroProperties): Line {
+        val timetableLines = properties.timetableLines
         require(stations.isNotEmpty()) { "$slug: 역 목록이 비었다" }
         require(stations.size == stations.distinct().size) {
             "$slug: 역이 중복됐다: ${stations.groupBy { it }.filter { it.value.size > 1 }.keys}"
@@ -115,6 +129,12 @@ class LineCatalog(properties: MetroProperties) {
         // 서울시 역별 시간표로 자리를 계산하므로 그 시간표가 있는 노선이어야 한다.
         require(scheduledTerminals.isEmpty() || (apiName ?: name) in timetableLines) {
             "$slug: scheduled-terminals 는 timetable-lines 에 있는 노선에만 적을 수 있다"
+        }
+        // 노선에 적은 값이 공통 값을 덮는다. 공항철도는 1 이 급행이 아니라 직통이다.
+        val kindsByDirectAt = properties.directAt + directAt
+        kindsByDirectAt.forEach { (value, kind) ->
+            require(value.isNotBlank()) { "$slug: direct-at 의 키가 비었다. 키를 대괄호로 감쌌는지 볼 것: $kindsByDirectAt" }
+            require(kind in properties.trainKinds) { "$slug: direct-at 이 train-kinds 에 없는 종류를 가리킨다: $value -> $kind" }
         }
         // 노선 순서와 반대로 적어도 되게 한다. 2호선 관심 구간이 강남에서 잠실인데
         // 역 순서로는 잠실이 앞이다.
@@ -154,6 +174,7 @@ class LineCatalog(properties: MetroProperties) {
             noService = noService.toSet(),
             foreignTrainPrefixes = foreignTrainPrefixes,
             scheduledTerminals = scheduledTerminals.toSet(),
+            kindsByDirectAt = kindsByDirectAt,
             transferFile = transferFile ?: slug,
         )
     }
@@ -198,3 +219,6 @@ class LineCatalog(properties: MetroProperties) {
         )
     }
 }
+
+/** 열차 종류의 색. 화면이 바탕색의 밝기로 글자색을 정하므로 이 꼴이어야 한다. */
+private val HEX_COLOR = Regex("#[0-9a-fA-F]{6}")

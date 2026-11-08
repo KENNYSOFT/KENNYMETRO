@@ -116,6 +116,14 @@ data class Line(
      * 시간표로 그린 열차라고 적는다(DESIGN.md 2.2.3).
      */
     val scheduledTerminals: Set<String>,
+    /**
+     * 실시간 위치의 `directAt` 값과 그 값이 뜻하는 열차 종류(lines.yml 의 train-kinds 이름).
+     *
+     * <p>
+     * 같은 값이 노선마다 다른 열차를 가리킨다. 9호선, 1호선, 경의중앙선은 1 이 급행이지만 공항철도는 1 이
+     * 승차권을 따로 끊는 직통이고, 경춘선은 ITX-청춘이 9 로 온다(DESIGN.md 2.2). 여기 없는 값은 보통 열차다.
+     */
+    val kindsByDirectAt: Map<String, String>,
     /** 환승 문 파일 이름(`transfer/<이름>-doors.csv`). 지선마다 뷰를 둔 노선은 한 파일을 나눠 쓴다. */
     val transferFile: String,
 ) {
@@ -133,6 +141,9 @@ data class Line(
 
     /** 다른 노선 열차라 이 뷰에 그리지 않는지. */
     fun isForeign(trainNo: String): Boolean = foreignTrainPrefixes.any { trainNo.startsWith(it) }
+
+    /** 실시간 위치의 `directAt` 값이 이 노선에서 뜻하는 열차 종류. 보통 열차면 null 이다. */
+    fun kindOf(directAt: String): String? = kindsByDirectAt[directAt]
 
     /**
      * 열차가 그 자리에서 돌아갈 수 있는지. 목록의 끝, 열차가 다니지 않는 역의 바로 옆, 평소 종착역이다.

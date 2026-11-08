@@ -8,6 +8,10 @@ import kr.kennysoft.kennymetro.seoul.TrainPositionDto
  * @param destination 종착역. 신분당선의 정자행처럼 노선 끝까지 가지 않는 열차가 있어
  *                    이 값이 열차를 고르는 기준이 된다. 실시간 종착역이 진행 방향과 어긋나고
  *                    시간표로도 찾지 못하면 null 이다(DESIGN.md 2.2.2).
+ * @param isExpress 실시간 위치의 `directAt` 이 1 인지. 이전 화면이 급행 표시에 읽던 값이라 공항철도 직통도
+ *                  그대로 참이다. 지금 화면은 `kind` 를 읽는다.
+ * @param kind 열차 종류(급행, ITX-청춘, 직통). 노선마다 `directAt` 값의 뜻을 따라 옮기고(`Line.kindOf`), 보통
+ *             열차는 null 이다.
  * @param service 평소 종착역까지 가는지, 먼저 끝나는지, 더 가는지, 다른 계통으로 갈라지는지.
  * @param fleet 몇 차분 차량인지. 편성번호로 차량을 특정할 수 있는 노선에만 있다.
  * @param status 현재역에 들어오는 중인지, 서 있는지, 떠났는지. 화면이 역과 역 사이에 놓는 근거다.
@@ -25,6 +29,7 @@ data class Train(
     val direction: Direction,
     val isLastTrain: Boolean,
     val isExpress: Boolean,
+    val kind: String?,
     val service: ServiceKind,
     val fleet: String?,
     val status: TrainStatus?,
@@ -156,6 +161,7 @@ private fun TrainPositionDto.toLinearTrain(line: Line, currentIndex: Int, termin
         direction = if (destination.index > currentIndex) Direction.DOWN else Direction.UP,
         isLastTrain = lstcarAt == "1",
         isExpress = directAt == "1",
+        kind = line.kindOf(directAt),
         service = destination.service,
         fleet = line.fleet?.labelFor(trainNo),
         status = status(),
@@ -167,7 +173,7 @@ private fun TrainPositionDto.toLinearTrain(line: Line, currentIndex: Int, termin
 
 /**
  * 종착역을 모르는 열차. 방향은 `updnLine` 으로 정하고, 어디서 끝나는지 모르므로 단축이나 연장도
- * 가리지 않는다. 막차와 급행 표시는 실시간 값 그대로 둔다.
+ * 가리지 않는다. 막차와 열차 종류는 실시간 값 그대로 둔다.
  */
 private fun TrainPositionDto.toTrainWithoutDestination(line: Line) = Train(
     trainNo = trainNo,
@@ -176,6 +182,7 @@ private fun TrainPositionDto.toTrainWithoutDestination(line: Line) = Train(
     direction = line.directionOf(updnLine),
     isLastTrain = lstcarAt == "1",
     isExpress = directAt == "1",
+    kind = line.kindOf(directAt),
     service = ServiceKind.NORMAL,
     fleet = line.fleet?.labelFor(trainNo),
     status = status(),
@@ -213,6 +220,7 @@ private fun TrainPositionDto.toCircularTrain(line: Line): Train? {
         direction = line.directionOf(updnLine),
         isLastTrain = lstcarAt == "1",
         isExpress = directAt == "1",
+        kind = line.kindOf(directAt),
         service = line.serviceAt(destinationIndex),
         fleet = line.fleet?.labelFor(trainNo),
         status = status(),

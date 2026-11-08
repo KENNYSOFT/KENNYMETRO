@@ -17,6 +17,9 @@
 # foreign-train-prefixes 는 실시간 위치에 섞여 오는 다른 노선 열차의 번호 머리다. 그 번호로 시작하는
 # 열차는 그 뷰에 그리지 않는다(DESIGN.md 2.2.1).
 #
+# direct-at 은 실시간 위치의 directAt 값이 그 노선에서 뜻하는 열차 종류(train-kinds 이름)다. 적지 않은
+# 값은 metro 아래의 direct-at 을 따른다. 공항철도는 1 이 직통이고 경춘선은 9 가 ITX-청춘이다.
+#
 # scheduled-terminals 는 실시간 위치가 빠지는 구간이 있어 역별 시간표로 자리를 계산해 그리는 열차의
 # 시발역이나 종착역이다. 시간표에서 이 역에서 출발하거나 이 역에서 끝나는 운행을 그 뷰의 역마다 따라가고,
 # 실시간 위치에 그 열차가 있으면 그것을 쓴다(DESIGN.md 2.2.3). timetable-lines 에 있는 노선에만 적을 수 있다.
@@ -107,6 +110,25 @@ metro:
     "[7호선]": "07호선"
     "[8호선]": "08호선"
     "[9호선]": "09호선"
+
+  # 열차에 붙이는 종류. 키가 화면에 적는 이름이고, 대괄호는 transfer-colors 와 같은 이유로 필수다.
+  # separate-ticket 은 승차권을 따로 끊는 열차라 화면이 단축이나 연장 색 대신 이 색으로 칩 테두리를 두르고
+  # note 를 범례에 적는다(DESIGN.md 1.6). 색은 ITX-청춘이 차체의 연두, 직통이 역 안내 표지의 주황이다.
+  train-kinds:
+    "[급행]":
+      color: "#dc2626"
+    "[ITX-청춘]":
+      color: "#8dc63f"
+      separate-ticket: true
+      note: 승차권을 따로 끊고 일부 역에만 섭니다
+    "[직통]":
+      color: "#f7941d"
+      separate-ticket: true
+      note: 승차권을 따로 끊고 서울역에서 공항까지 서지 않습니다
+
+  # 실시간 위치의 directAt 값이 뜻하는 열차 종류. 노선의 direct-at 이 같은 값을 적으면 그것을 쓴다(DESIGN.md 2.2).
+  direct-at:
+    "[1]": 급행
 
   lines:
     # 1호선은 구로에서 인천 방면과 신창 방면으로 갈려 역을 한 줄로 세울 수 없다.
@@ -371,6 +393,9 @@ metro:
       up-label: 청량리
       down-label: 춘천
       termini: [상봉, 춘천]
+      # ITX-청춘(2000번대)이 전동열차와 섞여 오고 directAt 이 9 다.
+      direct-at:
+        "[9]": ITX-청춘
       beyond:
         "[광운대]": 망우
         "[용산]": 청량리
@@ -445,6 +470,9 @@ metro:
       source: seoul
       up-label: 서울역
       down-label: 인천공항2터미널
+      # 직통열차(A1000번대)가 directAt 1 로 온다. 급행이 아니라 승차권을 따로 끊는 열차다.
+      direct-at:
+        "[1]": 직통
       stations: [서울역, 공덕, 홍대입구, 디지털미디어시티, 마곡나루, 김포공항, 계양, 검암,
                  청라국제도시, 영종, 운서, 공항화물청사, 인천공항1터미널, 인천공항2터미널]
 

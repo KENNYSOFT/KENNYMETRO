@@ -40,6 +40,27 @@ data class MetroProperties(
      * 노선 표기(`03호선`)다. 여기 없는 노선은 종착역이 의심스러워도 시간표를 부르지 않는다.
      */
     val timetableLines: Map<String, String> = emptyMap(),
+    /**
+     * 열차에 붙이는 종류. 키가 화면에 적는 이름이다(급행, ITX-청춘, 직통). 실시간 위치의 `directAt` 값이 어느
+     * 종류인지는 아래 `directAt` 과 노선의 `directAt` 이 정한다.
+     */
+    val trainKinds: Map<String, TrainKindConfig> = emptyMap(),
+    /**
+     * `directAt` 값과 그 값이 뜻하는 열차 종류. 노선이 같은 값을 적으면 노선 것을 쓴다. 기본은 1 이 급행이다.
+     */
+    val directAt: Map<String, String> = emptyMap(),
+)
+
+data class TrainKindConfig(
+    /** 화면이 그 종류의 표시와 칩 테두리에 쓰는 색. `#rrggbb` 다. */
+    val color: String,
+    /**
+     * 승차권을 따로 끊는 열차인지. ITX-청춘과 공항철도 직통이 그렇다. 화면은 이 열차에 단축이나 연장 색을 칠하지
+     * 않고 그 종류의 색으로 테두리를 두른다(DESIGN.md 1.6).
+     */
+    val separateTicket: Boolean = false,
+    /** 범례에 적는 설명. 승차권을 따로 끊는 열차에만 적는다. */
+    val note: String? = null,
 )
 
 data class LineConfig(
@@ -93,6 +114,11 @@ data class LineConfig(
      * 사이에서 실시간 위치에 오지 않는다(DESIGN.md 2.2.3).
      */
     val scheduledTerminals: List<String> = emptyList(),
+    /**
+     * 이 노선에서 `directAt` 값이 뜻하는 열차 종류. 적지 않은 값은 `MetroProperties.directAt` 을 따른다. 공항철도는
+     * 1 이 급행이 아니라 직통이고, 경춘선은 9 가 ITX-청춘이다(DESIGN.md 2.2).
+     */
+    val directAt: Map<String, String> = emptyMap(),
     /**
      * 환승 문 파일 이름(`transfer/<이름>-doors.csv`). 적지 않으면 slug 다. 지선마다 뷰를 둔
      * 노선은 원본 문서가 하나라 파일도 하나를 나눠 쓴다.

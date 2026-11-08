@@ -92,6 +92,7 @@ data class ScheduledPosition(
             direction = if (destination.index > currentIndex) Direction.DOWN else Direction.UP,
             isLastTrain = trip.isLast,
             isExpress = false,
+            kind = null,
             service = destination.service,
             fleet = null,
             status = status,

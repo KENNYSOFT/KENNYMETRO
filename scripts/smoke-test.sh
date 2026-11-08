@@ -117,6 +117,12 @@ SHUTTLE=$(curl -sf "$BASE/api/lines/line1-gwangmyeong/trains") || fail "광명�
 echo "$SHUTTLE" | grep -q '"trainNo":"7012","currentStation":"광명","destination":"영등포","direction":"UP"[^}]*"status":"DEPARTED"[^}]*"scheduled":true' \
   || fail "광명셔틀을 시간표로 그리지 못했다: $SHUTTLE"
 echo "$SHUTTLE" | grep -q '"trainNo":"0707"[^}]*"scheduled":false' || fail "실시간 열차가 응답에 없다: $SHUTTLE"
+# 실시간 위치의 directAt 값은 노선마다 뜻이 다르다(DESIGN.md 2.2). 경춘선은 9 가 ITX-청춘이고, 공항철도는 1 이
+# 급행이 아니라 승차권을 따로 끊는 직통이다.
+GYEONGCHUN=$(curl -sf "$BASE/api/lines/gyeongchun/trains") || fail "경춘선 열차 목록을 받지 못했다"
+echo "$GYEONGCHUN" | grep -q '"trainNo":"2017"[^}]*"kind":"ITX-청춘"' || fail "ITX-청춘을 열차 종류로 옮기지 못했다: $GYEONGCHUN"
+AIRPORT=$(curl -sf "$BASE/api/lines/airport/trains") || fail "공항철도 열차 목록을 받지 못했다"
+echo "$AIRPORT" | grep -q '"trainNo":"A1027"[^}]*"kind":"직통"' || fail "공항철도 직통을 열차 종류로 옮기지 못했다: $AIRPORT"
 
 # 환승 데이터는 classpath 리소스라 native image 에 자동으로 실리지 않는다. 힌트를 빠뜨리면
 # JVM 에서는 멀쩡히 읽히고 바이너리에서만 파일이 없는 것처럼 빈 목록이 된다.
@@ -162,14 +168,20 @@ views = {line["slug"]: line for line in json.loads(sys.stdin.buffer.read().decod
 anchors = views["line1-gyeongbu"]["anchors"]
 sys.exit(0 if anchors.get("인천") == "구로" and anchors.get("서동탄") == "병점" else 1)
 ' || fail "경부 뷰의 갈라지는 역이 응답에 없다: $LINES"
+# 열차 종류의 색과 설명. 화면이 열차의 kind 를 이것으로 그리므로 빠지면 ITX-청춘과 직통이 보통 열차처럼 보인다.
+echo "$LINES" | python3 -c '
+import json, sys
+kinds = json.loads(sys.stdin.buffer.read().decode("utf-8"))["trainKinds"]
+sys.exit(0 if kinds.get("직통", {}).get("separateTicket") is True and kinds.get("급행", {}).get("color") == "#dc2626" else 1)
+' || fail "열차 종류가 응답에 없다: $LINES"
 
-# 호출 원장. 위 trains 요청으로 서울시 API 를 스물여덟 번 불렀으니 그것이 파일에 남아야 한다. 실시간
-# 위치가 네 노선에 한 번씩, 3423 을 다시 보느라 역 코드 한 번과 시간표 상하행 두 번, 광명셔틀을
+# 호출 원장. 위 trains 요청으로 서울시 API 를 서른 번 불렀으니 그것이 파일에 남아야 한다. 실시간
+# 위치가 여섯 노선에 한 번씩, 3423 을 다시 보느라 역 코드 한 번과 시간표 상하행 두 번, 광명셔틀을
 # 그리느라 일곱 역의 역 코드 일곱 번과 시간표 상하행 열네 번이다.
 # 재배포해도 예산 표시가 이어지게 하는 장치라 실제로 파일이 생기는지까지 본다.
-echo "$LINES" | grep -q '"apiCallCount":28' || fail "호출 수가 응답에 없다: $LINES"
+echo "$LINES" | grep -q '"apiCallCount":30' || fail "호출 수가 응답에 없다: $LINES"
 [ -f "$LEDGER" ] || fail "호출 원장 파일이 생기지 않았다: $LEDGER"
-grep -q "^$DAY_BEFORE 28$" "$LEDGER" || fail "오늘 호출 수가 원장에 없다: $(cat "$LEDGER")"
+grep -q "^$DAY_BEFORE 30$" "$LEDGER" || fail "오늘 호출 수가 원장에 없다: $(cat "$LEDGER")"
 
 # favicon 은 XML 이라 주석에 붙임표 두 개만 들어가도 브라우저가 렌더링을 거부한다.
 # 인라인으로 넣어 보면 HTML 파서가 관대해서 그냥 지나가므로 파일 그대로 파싱해 본다.
@@ -197,10 +209,10 @@ BODY=$(curl -sf "$BASE/api/lines/shinbundang/trains") || fail "빈 목록 응답
 echo "$BODY" | grep -q '"trains":\[\]' || fail "빈 목록이 아니다: $BODY"
 echo "$BODY" | grep -q '"line":"shinbundang"' || fail "노선 표시가 빠졌다: $BODY"
 
-# 앱을 껐다 켰으므로 호출 수는 28 에서 이어져 29 여야 한다. 원장을 안 읽으면 여기서 1 이 된다.
+# 앱을 껐다 켰으므로 호출 수는 30 에서 이어져 31 이어야 한다. 원장을 안 읽으면 여기서 1 이 된다.
 LINES=$(curl -sf "$BASE/api/lines") || fail "노선 목록을 받지 못했다"
 if [ "$(date '+%Y-%m-%d')" = "$DAY_BEFORE" ]; then
-  echo "$LINES" | grep -q '"apiCallCount":29' || fail "재기동 후 호출 수를 이어받지 못했다: $LINES"
+  echo "$LINES" | grep -q '"apiCallCount":31' || fail "재기동 후 호출 수를 이어받지 못했다: $LINES"
 else
   echo "  자정을 넘겨 이어받기 확인은 건너뛴다"
 fi

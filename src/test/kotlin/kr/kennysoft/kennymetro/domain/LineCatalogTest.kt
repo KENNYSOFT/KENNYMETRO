@@ -13,6 +13,7 @@ import io.kotest.matchers.string.shouldContain
 import kr.kennysoft.kennymetro.TestLines
 import kr.kennysoft.kennymetro.config.LineConfig
 import kr.kennysoft.kennymetro.config.MetroProperties
+import kr.kennysoft.kennymetro.config.TrainKindConfig
 
 class LineCatalogTest : FreeSpec({
 
@@ -361,5 +362,55 @@ class LineCatalogTest : FreeSpec({
 
         // when & then
         shouldThrow<IllegalArgumentException> { LineCatalog(broken) }
+    }
+
+    "노선의 direct-at 이 train-kinds 에 없는 종류를 가리키면 기동이 실패한다" {
+        // given - 화면은 열차의 kind 를 train-kinds 의 색으로 그린다. 이름이 어긋나면 그 열차가 보통 열차로 보인다.
+        val broken = MetroProperties(
+            lines = listOf(
+                LineConfig(
+                    slug = "test",
+                    name = "테스트선",
+                    color = "#000000",
+                    source = LineSource.SEOUL,
+                    upLabel = "위",
+                    downLabel = "아래",
+                    stations = listOf("가", "나"),
+                    directAt = mapOf("9" to "ITX청춘"),
+                )
+            ),
+            trainKinds = mapOf("ITX-청춘" to TrainKindConfig(color = "#8dc63f", separateTicket = true, note = "설명")),
+        )
+
+        // when
+        val error = shouldThrow<IllegalArgumentException> { LineCatalog(broken) }
+
+        // then - 어느 설정이 틀렸는지 알려야 한다.
+        error.message shouldContain "direct-at"
+    }
+
+    "열차 종류의 색이 #rrggbb 가 아니거나 승차권을 따로 끊는 종류에 범례 설명이 없으면 기동이 실패한다" {
+        // given - 화면은 바탕색의 밝기로 글자색을 정하고, 승차권을 따로 끊는 열차는 범례의 설명으로 알린다.
+        fun catalogWith(kind: TrainKindConfig) = LineCatalog(
+            MetroProperties(
+                lines = listOf(
+                    LineConfig(
+                        slug = "test",
+                        name = "테스트선",
+                        color = "#000000",
+                        source = LineSource.SEOUL,
+                        upLabel = "위",
+                        downLabel = "아래",
+                        stations = listOf("가", "나"),
+                    )
+                ),
+                trainKinds = mapOf("직통" to kind),
+            )
+        )
+
+        // when & then
+        shouldThrow<IllegalArgumentException> { catalogWith(TrainKindConfig(color = "orange")) }.message shouldContain "#rrggbb"
+        shouldThrow<IllegalArgumentException> { catalogWith(TrainKindConfig(color = "#f7941d", separateTicket = true)) }
+            .message shouldContain "note"
     }
 })

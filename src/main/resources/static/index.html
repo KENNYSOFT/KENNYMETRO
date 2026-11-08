@@ -17,7 +17,6 @@
     --warn-fg: #9a3412;
     --ext-bg: #e0f2fe;
     --ext-fg: #075985;
-    --express: #dc2626;
     --arrow-up: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='14' viewBox='0 0 22 14'%3E%3Cpath d='M3 11 11 3l8 8' fill='none' stroke='%23a1a1aa' stroke-opacity='.45' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
     --arrow-down: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='14' viewBox='0 0 22 14'%3E%3Cpath d='M3 3l8 8 8-8' fill='none' stroke='%23a1a1aa' stroke-opacity='.45' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   }
@@ -33,7 +32,6 @@
       --warn-fg: #fdba74;
       --ext-bg: #0c2a3d;
       --ext-fg: #7dd3fc;
-      --express: #ef4444;
       --arrow-up: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='14' viewBox='0 0 22 14'%3E%3Cpath d='M3 11 11 3l8 8' fill='none' stroke='%2371717a' stroke-opacity='.6' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
       --arrow-down: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='14' viewBox='0 0 22 14'%3E%3Cpath d='M3 3l8 8 8-8' fill='none' stroke='%2371717a' stroke-opacity='.6' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
     }
@@ -156,11 +154,15 @@
     font-size: 12px; line-height: 1.35;
   }
   .train .no { color: var(--muted); font-size: 11px; }
-  /* 급행은 칩 배경과 따로 표시한다. 배경은 단축, 연장 같은 운행 범위가 쓰므로 둘이 겹쳐도 갈린다. */
-  .train .exp {
-    align-self: center; background: var(--express); color: #fff;
+  /* 열차 종류(급행, ITX-청춘, 직통)는 칩 배경과 따로 표시한다. 배경은 단축, 연장 같은 운행 범위가 쓰므로 둘이 겹쳐도
+     읽힌다. 바탕은 그 종류의 색이고 글자색은 스크립트가 바탕의 밝기로 정한다. */
+  .train .grade {
+    align-self: center; background: var(--muted); color: var(--bg);
     font-size: 10px; font-weight: 700; line-height: 1; padding: 3px 4px; border-radius: 3px;
   }
+  /* 승차권을 따로 끊는 열차(ITX-청춘, 공항철도 직통). 운행 범위 색 대신 그 종류의 색으로 테두리를 두른다. 바탕까지
+     물들이면 주황인 직통이 단축과 헷갈린다. */
+  .train.ticket { box-shadow: inset 0 0 0 2px var(--kind); }
   .train .tag { font-size: 11px; font-weight: 600; color: var(--warn-fg); }
   /* 시간표로 자리를 계산한 열차. 운행 범위 표시(배경)와 겹쳐도 읽히도록 글로 적는다. */
   .train .sched { font-size: 11px; color: var(--muted); }
@@ -313,6 +315,8 @@ let preset = [];
 let budget = { apiCallBudget: 0, apiCallCount: 0 };
 let transfersByLine = {};
 let transferColors = {};
+/** 열차 종류(급행, ITX-청춘, 직통)의 색과 설명. 열차의 kind 가 이 이름이다. */
+let trainKinds = {};
 
 /**
  * 이 브라우저의 설정.
@@ -833,11 +837,15 @@ const KINDS = {
  * 열차를 글과 함께 적는 칩은 역 줄에 있지 않아 옮기지 않는다.
  */
 function trainChip(line, t, at, fetched) {
-  const kind = KINDS[t.service];
+  // 승차권을 따로 끊는 열차는 운행 범위를 칠하지 않는다. 그 열차를 탈지는 행선지보다 승차권이 먼저 정한다.
+  const ticket = ticketKindOf(t);
+  const kind = ticket ? null : KINDS[t.service];
   let cls = 'train';
   if (kind) cls += ' ' + kind.cls;
+  if (ticket) cls += ' ticket';
   if (t.fleet) cls += ' fleet';
   const chip = el('div', cls);
+  if (ticket) chip.style.setProperty('--kind', ticket.color);
   if (at !== undefined && t.status) {
     chip.dataset.at = String(at);
     chip.dataset.dir = t.direction;
@@ -856,11 +864,12 @@ function trainChip(line, t, at, fetched) {
     title.push(t.fleet);
   }
   if (kind) title.push(kind.label + ': ' + kind.note);
+  if (ticket) title.push(t.kind + ': ' + ticket.note);
   // 실시간 종착역이 진행 방향과 어긋나고 시간표로도 찾지 못한 열차. 방향만 믿을 수 있다.
   if (t.destination == null) title.push('행선지 불명: 실시간 정보의 종착역이 진행 방향과 맞지 않습니다');
   // 실시간 위치가 오지 않는 구간이라 시간표로 자리를 계산한 열차(광명셔틀). 늦게 다녀도 화면은 모른다.
   if (t.scheduled) title.push('시간표 기준: 이 구간에서는 실시간 위치가 오지 않아 시간표로 자리를 계산했습니다');
-  if (t.isExpress) chip.appendChild(el('span', 'exp', '급행'));
+  if (t.kind) chip.appendChild(kindBadge(t.kind));
   chip.appendChild(el('span', 'dst', t.destination == null ? '행선지 불명' : t.destination + '행'));
   if (t.isLastTrain) chip.appendChild(el('span', 'tag', '막차'));
   if (t.scheduled) chip.appendChild(el('span', 'sched', '시간표'));
@@ -869,17 +878,59 @@ function trainChip(line, t, at, fetched) {
   return chip;
 }
 
-/** 지금 그려진 열차에 있는 운행 종류만 범례로 적는다. 시간표로 그린 열차가 있으면 그것도 적는다. */
+/**
+ * 승차권을 따로 끊는 열차의 종류. ITX-청춘과 공항철도 직통이 그렇고, 보통 열차와 급행은 null 이다.
+ */
+function ticketKindOf(t) {
+  const type = t.kind ? trainKinds[t.kind] : null;
+  return type && type.separateTicket ? type : null;
+}
+
+/** 열차 종류 표시. 바탕은 그 종류의 색이고 글자색은 바탕의 밝기로 정한다 - 연두와 주황 바탕에 흰 글자는 읽히지 않는다. */
+function kindBadge(name) {
+  const badge = el('span', 'grade', name);
+  const type = trainKinds[name];
+  if (type) {
+    badge.style.background = type.color;
+    badge.style.color = isLight(type.color) ? '#111' : '#fff';
+  }
+  return badge;
+}
+
+/** `#rrggbb` 색이 밝은지. 상대 휘도가 검은 글자와 흰 글자의 대비가 같아지는 0.179 를 넘으면 밝다. */
+function isLight(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map(v => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.179;
+}
+
+/**
+ * 지금 그려진 열차에 있는 운행 종류만 범례로 적는다. 승차권을 따로 끊는 열차와 시간표로 그린 열차가 있으면 그것도
+ * 적는다. 승차권을 따로 끊는 열차는 운행 종류를 칠하지 않으므로 운행 종류를 셀 때 뺀다.
+ */
 function renderKinds(section, trains) {
   const box = section.querySelector('.kinds');
   if (!box) return;
-  const present = new Set(trains.map(t => t.service));
+  const present = new Set(trains.filter(t => !ticketKindOf(t)).map(t => t.service));
   box.replaceChildren();
   for (const [service, kind] of Object.entries(KINDS)) {
     if (!present.has(service)) continue;
     const item = el('span');
     item.appendChild(el('span', 'train ' + kind.cls, kind.label));
     item.appendChild(document.createTextNode(' ' + kind.note));
+    box.appendChild(item);
+  }
+  for (const name of new Set(trains.filter(t => ticketKindOf(t)).map(t => t.kind))) {
+    const type = trainKinds[name];
+    const item = el('span');
+    const sample = el('span', 'train ticket');
+    sample.style.setProperty('--kind', type.color);
+    sample.appendChild(kindBadge(name));
+    item.appendChild(sample);
+    item.appendChild(document.createTextNode(' ' + type.note));
     box.appendChild(item);
   }
   // 운행 종류와 따로 적는다. 평소 운행이어도 실시간 위치가 아니라는 것은 알아야 한다.
@@ -1546,7 +1597,8 @@ async function boot() {
   preset = (data.preset || []).filter(slug => bySlug.has(slug));
   if (preset.length === 0) preset = lines.map(l => l.slug);
   transferColors = data.transferColors || {};
-  budget = { apiCallBudget: data.apiCallBudget, apiCallCount: data.apiCallCount };
+  trainKinds = data.trainKinds || {};
+  budget ={ apiCallBudget: data.apiCallBudget, apiCallCount: data.apiCallCount };
 
   // 저장된 것이 없으면 첫 노선만 펼친다. 펼친 노선 수만큼 호출 예산이 나가므로
   // 전부 펼친 채로 시작하지 않는다.

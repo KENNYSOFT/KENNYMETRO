@@ -4,6 +4,7 @@ import kr.kennysoft.kennymetro.domain.Fleet
 import kr.kennysoft.kennymetro.domain.Line
 import kr.kennysoft.kennymetro.domain.LineCatalog
 import kr.kennysoft.kennymetro.domain.LineSource
+import kr.kennysoft.kennymetro.domain.TrainKind
 import kr.kennysoft.kennymetro.seoul.SeoulSubwayProperties
 import kr.kennysoft.kennymetro.seoul.TrainPositionService
 import org.springframework.web.bind.annotation.GetMapping
@@ -25,6 +26,7 @@ class LineController(
         lines = ArrayList(catalog.all().map { it.toView() }),
         preset = ArrayList(catalog.preset()),
         transferColors = LinkedHashMap(catalog.transferColors()),
+        trainKinds = LinkedHashMap(catalog.trainKinds()),
         stationAliases = LinkedHashMap(catalog.stationAliases()),
         apiCallBudget = properties.dailyCallBudget,
         apiCallCount = trainPositionService.apiCallCount(),
@@ -60,6 +62,8 @@ data class LinesResponse(
     val preset: List<String>,
     /** 환승 문 위치에 노선 동그라미를 붙이는 데 쓴다. */
     val transferColors: Map<String, String>,
+    /** 열차 종류(급행, ITX-청춘, 직통)의 색과 설명. 화면이 열차의 `kind` 를 이것으로 그린다. */
+    val trainKinds: Map<String, TrainKind>,
     /** API 가 우리와 다르게 적는 역명. `scripts/probe-coverage.sh` 가 역명을 대조할 때 쓴다. */
     val stationAliases: Map<String, String>,
     val apiCallBudget: Int,

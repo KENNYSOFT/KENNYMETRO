@@ -21,7 +21,7 @@ MODE = os.environ.get("STUB_MODE", "trains")
 PORT = int(os.environ.get("STUB_PORT", "18090"))
 
 
-def position(train_no, current, terminal, updn, recptn="2026-09-22 21:00:00", last="0", sttus="1"):
+def position(train_no, current, terminal, updn, recptn="2026-09-22 21:00:00", last="0", sttus="1", direct="0"):
     return {
         "subwayId": "1077",
         "subwayNm": "신분당선",
@@ -32,7 +32,7 @@ def position(train_no, current, terminal, updn, recptn="2026-09-22 21:00:00", la
         "statnTnm": terminal,
         "updnLine": updn,
         "trainSttus": sttus,
-        "directAt": "0",
+        "directAt": direct,
         "lstcarAt": last,
         "recptnDt": recptn,
     }
@@ -68,6 +68,18 @@ POSITIONS = {
     # 흉내내 셔틀 없이 같은 선로를 지나는 다른 1호선 열차만 준다.
     "1호선": positions(
         position("0707", "영등포", "천안", "1"),
+    ),
+    # directAt 값은 노선마다 뜻이 다르다. 경춘선은 ITX-청춘이 9 로 오고, 공항철도는 직통열차(A1000번대)가 1 로
+    # 온다(DESIGN.md 2.2). 실제로 받은 번호다. 청량리행과 검암행은 각각 연장과 단축으로 칠해진다.
+    "경춘선": positions(
+        position("2017", "가평", "춘천", "1", direct="9"),
+        position("8050", "망우", "청량리", "0"),
+        position("8049", "갈매", "춘천", "1", sttus="2"),
+    ),
+    "공항철도": positions(
+        position("A1027", "마곡나루", "인천공항2터미널", "1", direct="1"),
+        position("A2123", "홍대입구", "인천공항2터미널", "1"),
+        position("A3053", "김포공항", "검암", "1"),
     ),
 }
 

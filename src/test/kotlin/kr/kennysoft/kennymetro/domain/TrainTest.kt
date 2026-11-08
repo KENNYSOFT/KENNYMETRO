@@ -95,6 +95,24 @@ class TrainTest : FreeSpec({
         // then
         train.isLastTrain.shouldBeTrue()
         train.isExpress.shouldBeTrue()
+        train.kind shouldBe "급행"
+    }
+
+    "열차 종류는 노선마다 directAt 값의 뜻을 따라 옮긴다" {
+        // given - 9호선은 1 이 급행이지만 공항철도는 1 이 승차권을 따로 끊는 직통이다. 경춘선의 ITX-청춘은 9 로 온다.
+        fun trainOf(slug: String, current: String, terminal: String, directAt: String) =
+            position(current = current, terminal = terminal, updnLine = "1", directAt = directAt).toTrain(TestLines.bySlug(slug))!!
+        val direct = trainOf("airport", "마곡나루", "인천공항2터미널", "1")
+
+        // when & then
+        trainOf("line9", "여의도", "중앙보훈병원", "1").kind shouldBe "급행"
+        direct.kind shouldBe "직통"
+        trainOf("airport", "마곡나루", "인천공항2터미널", "0").kind.shouldBeNull()
+        trainOf("gyeongchun", "가평", "춘천", "9").kind shouldBe "ITX-청춘"
+        trainOf("gyeongchun", "가평", "춘천", "0").kind.shouldBeNull()
+        TestLines.catalog.trainKinds().getValue("ITX-청춘").separateTicket.shouldBeTrue()
+        // 이전 화면은 isExpress 로 급행 표시를 붙인다. 그 값은 directAt 1 을 그대로 옮긴다.
+        direct.isExpress.shouldBeTrue()
     }
 
     "진입, 도착, 출발을 옮기고 전역출발은 진입과 같은 자리에 둔다" {

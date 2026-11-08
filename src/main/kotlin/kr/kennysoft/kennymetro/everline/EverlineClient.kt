@@ -114,6 +114,7 @@ fun EverlineTrainDto.toTrain(line: Line): Train? {
         // 이 엔드포인트에는 막차와 급행 표시가 없다. 용인경전철은 급행 운행도 없다.
         isLastTrain = false,
         isExpress = false,
+        kind = null,
         service = line.serviceAt(destinationIndex),
         fleet = line.fleet?.labelFor(trainNo),
         status = status,
