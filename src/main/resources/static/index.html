@@ -45,8 +45,28 @@
     font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", "Malgun Gothic", sans-serif;
     -webkit-text-size-adjust: 100%;
   }
-  h1 { font-size: 19px; margin: 0 0 2px; }
+  /* 머리말은 스크롤해도 화면 위에 붙어 있다. 노선 고르기 패널은 길어질 수 있어 머리말 밖에 둔다. 바탕을 화면 양끝까지
+     깔려고 본문 여백만큼 밖으로 넓힌다. */
+  header {
+    position: sticky; top: 0; z-index: 10;
+    margin: -16px -16px 0; padding: 12px 16px 8px;
+    background: var(--bg); border-bottom: 1px solid var(--edge);
+  }
+  .top-row { display: flex; align-items: center; gap: 8px; }
+  h1 { font-size: 19px; margin: 0; flex: 1; min-width: 0; }
+  .top-buttons { display: flex; gap: 6px; flex: none; }
+  .top-buttons button {
+    border: 0; background: var(--card); color: inherit; cursor: pointer;
+    font: inherit; font-size: 12px; padding: 3px 9px; border-radius: 999px;
+  }
+  .top-buttons button[aria-expanded="true"] { font-weight: 700; }
   #budget { font-size: 12px; color: var(--muted); }
+  /* 노선마다 같은 보는 법을 한곳에 모은다. 처음 방문하면 펼쳐 두고, 접으면 이 브라우저에 남는다. */
+  .guide { margin: 6px 0 0; padding-left: 18px; font-size: 12px; color: var(--muted); line-height: 1.5; }
+  /* 머리말에 가리지 않게, 펼친 노선이나 노선 고르기 패널로 옮겨 갈 때 머리말 높이만큼 띄운다. */
+  .line, .pick { scroll-margin-top: calc(var(--top-h, 0px) + 8px); }
+  /* 머리말의 아래 선이 첫 노선의 위 선을 대신한다. */
+  #lines .line:first-child { border-top: 0; }
 
   /* 노선 하나가 한 덩어리다. 접으면 폴링도 멈춘다. */
   .line { border-top: 1px solid var(--edge); padding: 12px 0 4px; }
@@ -60,7 +80,12 @@
   .caret { color: var(--muted); font-size: 11px; }
   .line-status { font-size: 12px; color: var(--muted); }
   .line-body { padding-top: 6px; }
-  .legend { font-size: 12px; color: var(--muted); margin: 0 0 10px; }
+  /* 노선도 두 칸의 방면. 이름 칸의 너비(--name-w)는 노선도의 것을 받고, em 이 같은 값이 되게 글자 크기도 노선도와
+     맞춘다. */
+  .heads { display: grid; grid-template-columns: 1fr var(--name-w) 1fr; font-size: 13px; margin: 0 0 2px; }
+  .heads span { font-size: 12px; color: var(--muted); word-break: keep-all; }
+  .heads .up { text-align: right; }
+  .heads .down { grid-column: 3; }
 
   /* 편성 차수 범례. 색이 무엇을 뜻하는지 여기서만 말한다. */
   .fleet-legend { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; font-size: 12px; margin: 0 0 10px; }
@@ -188,14 +213,14 @@
   .train.short .no, .train.ext .no { color: inherit; opacity: .7; }
 
   /* 범례. 지금 그려진 열차에 있는 것만 적는다. 나올 수 없는 운행까지 적으면 설명이 아니라 소음이다. */
-  .kinds { display: flex; gap: 6px 12px; flex-wrap: wrap; align-items: center; font-size: 12px; color: var(--muted); margin: -4px 0 10px; }
+  .kinds { display: flex; gap: 6px 12px; flex-wrap: wrap; align-items: center; font-size: 12px; color: var(--muted); margin: 0 0 8px; }
   /* display 를 정한 요소는 hidden 속성이 먹지 않는다. */
   .kinds[hidden] { display: none; }
   .kinds .train { font-size: 11px; padding: 1px 6px; }
   .kinds .train.branch { padding: 0 5px; }
 
   @media (max-width: 480px) {
-    .rail { font-size: 12px; }
+    .rail, .heads { font-size: 12px; }
     .train { font-size: 11px; padding: 2px 6px; column-gap: 3px; }
     .train.branch { padding: 1px 5px; }
     .lane { gap: 4px; }
@@ -302,19 +327,29 @@
 </style>
 </head>
 <body>
-<header>
-  <h1>수도권 전철 실시간</h1>
-  <div id="budget"></div>
-  <div class="scope">
-    <button type="button" id="pick-toggle">노선 고르기</button>
+<header id="top">
+  <div class="top-row">
+    <h1>수도권 전철 실시간</h1>
+    <div class="top-buttons">
+      <button type="button" id="guide-toggle" aria-controls="guide">보는 법</button>
+      <button type="button" id="pick-toggle">노선 고르기</button>
+    </div>
   </div>
-  <div class="pick" id="pick" hidden></div>
+  <div id="budget"></div>
+  <ul class="guide" id="guide">
+    <li>역과 역 사이에 놓인 열차는 그 역을 떠났거나 들어오는 중입니다.</li>
+    <li>흐린 역은 관심 구간 밖이라 구간으로 들어오는 열차만 그립니다.</li>
+    <li>밑줄 친 역에서 옆의 동그라미 색 노선으로 갈아탈 수 있습니다. 누르면 환승 문 위치가 타고 온 열차 쪽에 열립니다.</li>
+    <li>역 아래 비스듬한 선은 그 역에서 나뉘는 방면입니다. 밑줄 친 방면을 누르면 그 노선을 펼칩니다.</li>
+  </ul>
 </header>
+<div class="pick" id="pick" hidden></div>
 
 <div id="lines"></div>
 
 <footer>
-  자료: 서울시 실시간 지하철 정보, 용인경전철. 환승 문 위치와 편성 차수의 출처는 노선마다 적었습니다.
+  <div>자료: 서울시 실시간 지하철 정보, 용인경전철. 환승 문 위치와 편성 차수의 출처는 노선마다 적었습니다.</div>
+  <div id="license"></div>
 </footer>
 
 <script>
@@ -337,9 +372,10 @@ let trainKinds = {};
  *
  * 보여줄 노선, 관심 구간, 주요 역, 구간 끝 너머로 미리 볼 역 수는 사람마다 다르다. 서버에 계정을
  * 두지 않으므로 여기에 둔다. 비어 있는 칸은 서버가 준 프리셋이나 기본값을 쓴다 - 즉 아무것도
- * 고르지 않은 사람은 프리셋을 보고, 고친 항목만 자기 값으로 덮인다.
+ * 고르지 않은 사람은 프리셋을 보고, 고친 항목만 자기 값으로 덮인다. 머리말의 보는 법은 처음에 펼쳐
+ * 두고, 한 번 접으면 접힌 채로 남는다(guide).
  */
-let view = { lines: null, open: [], full: [], focus: {}, key: {}, peek: {} };
+let view = { lines: null, open: [], full: [], focus: {}, key: {}, peek: {}, guide: true };
 
 /** 설정 패널이 열려 있는지. 화면을 다시 그려도 닫히지 않게 들고 있을 뿐 저장하지는 않는다. */
 const openSettings = new Set();
@@ -356,6 +392,7 @@ function loadView() {
       focus: saved.focus && typeof saved.focus === 'object' ? saved.focus : {},
       key: saved.key && typeof saved.key === 'object' ? saved.key : {},
       peek: saved.peek && typeof saved.peek === 'object' ? saved.peek : {},
+      guide: saved.guide !== false,
     };
   } catch (e) {
     // 사생활 보호 모드나 저장소 차단. 기본값으로 간다.
@@ -1254,12 +1291,13 @@ function buildSection(line) {
   section.appendChild(head);
 
   const body = el('div', 'line-body');
-  body.appendChild(buildLegend(line));
   const kinds = el('div', 'kinds');
   kinds.hidden = true;
   body.appendChild(kinds);
   if (line.fleet) body.appendChild(buildFleetLegend(line));
-  body.appendChild(buildRail(line));
+  const rail = buildRail(line);
+  body.appendChild(buildHeads(line, rail));
+  body.appendChild(rail);
   body.appendChild(buildTools(line));
   body.appendChild(buildSettings(line));
   const credits = buildCredits(line);
@@ -1283,23 +1321,16 @@ function buildSection(line) {
   return section;
 }
 
-function buildLegend(line) {
-  const p = el('p', 'legend');
-  // 순환선은 방면 대신 외선과 내선으로 갈린다.
-  p.appendChild(document.createTextNode(line.circular
-    ? '↑ 왼쪽은 ' + directionName(line.upLabel) + ', ↓ 오른쪽은 ' + directionName(line.downLabel) + ' 열차입니다. '
-    : '↑ 왼쪽은 ' + line.upLabel + ' 방면, ↓ 오른쪽은 ' + line.downLabel + ' 방면입니다. '));
-  if (line.live) {
-    p.appendChild(document.createTextNode('역과 역 사이에 놓인 열차는 그 역을 떠났거나 들어오는 중입니다. '));
-    const layout = layoutOf(line);
-    if (layout.shown.above + layout.shown.below > 0) {
-      p.appendChild(document.createTextNode('흐린 역은 관심 구간 밖이라 구간으로 들어오는 열차만 그립니다. '));
-    }
-  }
-  if (transfersByLine[line.slug]) {
-    p.appendChild(document.createTextNode('밑줄 친 역에서 옆의 동그라미 색 노선으로 갈아탈 수 있습니다. 누르면 환승 문 위치가 타고 온 열차 쪽에 열립니다.'));
-  }
-  return p;
+/**
+ * 노선도 두 칸의 방면. 왼쪽 칸의 열차는 목록 위쪽으로, 오른쪽 칸은 아래쪽으로 간다. 순환선은 방면 대신 도는 쪽을
+ * 적는다. 노선마다 같은 보는 법은 머리말에 한 번만 적는다.
+ */
+function buildHeads(line, rail) {
+  const heads = el('div', 'heads');
+  heads.style.setProperty('--name-w', rail.style.getPropertyValue('--name-w'));
+  heads.appendChild(el('span', 'up', '↑ ' + directionName(line.upLabel)));
+  heads.appendChild(el('span', 'down', directionName(line.downLabel) + ' ↓'));
+  return heads;
 }
 
 function buildFleetLegend(line) {
@@ -1319,7 +1350,7 @@ function buildFleetLegend(line) {
 
 /**
  * 출처 표기. 노선마다 가져온 문서가 다르고, 위키는 계속 고쳐지므로 판까지 적는다.
- * CC BY 조건이라 뺄 수 없다.
+ * CC BY 조건이라 뺄 수 없다. 라이선스는 노선마다 같아 맨 아래에 한 번만 적는다(renderLicense).
  */
 function buildCredits(line) {
   const transfer = transfersByLine[line.slug];
@@ -1343,18 +1374,30 @@ function buildCredits(line) {
     row.appendChild(a);
     box.appendChild(row);
   }
-
-  const license = transfer && transfer.source ? transfer.source : null;
-  const row = el('div');
-  row.appendChild(document.createTextNode('나무위키 문서는 '));
-  const a = el('a', null, license ? license.license : 'CC BY-NC-SA 2.0 KR');
-  a.href = license ? license.licenseUrl : 'https://creativecommons.org/licenses/by-nc-sa/2.0/kr/';
-  a.rel = 'license noopener';
-  a.target = '_blank';
-  row.appendChild(a);
-  row.appendChild(document.createTextNode(' 를 따릅니다.'));
-  box.appendChild(row);
   return box;
+}
+
+/**
+ * 나무위키 문서의 라이선스. 노선마다 문서명과 판을 적고 라이선스는 맨 아래에 한 번만 적는다. 이름과 주소는 받아 온
+ * 환승 데이터의 출처에서 가져오고, 아직 받은 것이 없으면 그 문서들이 따르는 CC BY-NC-SA 2.0 KR 을 적는다.
+ */
+function renderLicense() {
+  const licenses = new Map();
+  for (const transfer of Object.values(transfersByLine)) {
+    if (transfer && transfer.source) licenses.set(transfer.source.license, transfer.source.licenseUrl);
+  }
+  if (licenses.size === 0) licenses.set('CC BY-NC-SA 2.0 KR', 'https://creativecommons.org/licenses/by-nc-sa/2.0/kr/');
+  const box = document.getElementById('license');
+  box.replaceChildren(document.createTextNode('나무위키 문서는 '));
+  [...licenses].forEach(([name, url], i) => {
+    if (i > 0) box.appendChild(document.createTextNode(', '));
+    const a = el('a', null, name);
+    a.href = url;
+    a.rel = 'license noopener';
+    a.target = '_blank';
+    box.appendChild(a);
+  });
+  box.appendChild(document.createTextNode(' 를 따릅니다.'));
 }
 
 /** 그 노선 섹션만 다시 그린다. 설정을 바꾸면 역 범위와 굵은 역이 함께 달라진다. */
@@ -1547,7 +1590,8 @@ function renderPicker() {
   reset.type = 'button';
   reset.addEventListener('click', () => {
     if (!confirm('고른 노선과 구간 설정을 지우고 기본 설정으로 돌아갑니다.')) return;
-    view = { lines: null, open: chosenDefaultOpen(), full: [], focus: {}, key: {}, peek: {} };
+    // 보는 법을 접어 둔 것은 노선 설정이 아니라 그대로 둔다.
+    view = { lines: null, open: chosenDefaultOpen(), full: [], focus: {}, key: {}, peek: {}, guide: view.guide };
     saveView();
     renderAll();
   });
@@ -1669,7 +1713,21 @@ async function renderAll() {
   document.getElementById('lines').replaceChildren(...visibleLines().map(buildSection));
   renderPicker();
   renderBudget();
+  renderLicense();
+  measureTop();
   refreshOpen();
+}
+
+/** 머리말 높이. 노선으로 옮겨 갈 때 머리말에 가리지 않게 그만큼 띄우는 데 쓴다. */
+function measureTop() {
+  document.documentElement.style.setProperty('--top-h', document.getElementById('top').offsetHeight + 'px');
+}
+
+/** 머리말의 보는 법을 펼치거나 접는다. 접은 것은 이 브라우저에 남는다. */
+function applyGuide() {
+  document.getElementById('guide').hidden = !view.guide;
+  document.getElementById('guide-toggle').setAttribute('aria-expanded', String(view.guide));
+  measureTop();
 }
 
 async function boot() {
@@ -1682,7 +1740,7 @@ async function boot() {
   if (preset.length === 0) preset = lines.map(l => l.slug);
   transferColors = data.transferColors || {};
   trainKinds = data.trainKinds || {};
-  budget ={ apiCallBudget: data.apiCallBudget, apiCallCount: data.apiCallCount };
+  budget = { apiCallBudget: data.apiCallBudget, apiCallCount: data.apiCallCount };
 
   // 저장된 것이 없으면 첫 노선만 펼친다. 펼친 노선 수만큼 호출 예산이 나가므로
   // 전부 펼친 채로 시작하지 않는다.
@@ -1693,7 +1751,16 @@ async function boot() {
   pickToggle.addEventListener('click', () => {
     pick.hidden = !pick.hidden;
     pickToggle.textContent = pick.hidden ? '노선 고르기' : '노선 고르기 닫기';
+    // 머리말은 붙어 있지만 패널은 맨 위에 있어, 내려 본 뒤 열면 패널로 옮겨 가야 보인다.
+    if (!pick.hidden) pick.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
+
+  document.getElementById('guide-toggle').addEventListener('click', () => {
+    view.guide = !view.guide;
+    saveView();
+    applyGuide();
+  });
+  applyGuide();
 
   await renderAll();
 }
@@ -1709,6 +1776,7 @@ document.addEventListener('visibilitychange', () => {
 const shiftAll = () => document.querySelectorAll('.rail').forEach(shiftChips);
 setInterval(shiftAll, SHIFT_MS);
 window.addEventListener('resize', shiftAll);
+window.addEventListener('resize', measureTop);
 </script>
 </body>
 </html>
