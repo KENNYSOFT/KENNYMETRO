@@ -121,6 +121,20 @@
   /* 끝 너머 몇 역 안에 들어오는 열차가 없을 때 그보다 바깥의 한 대를 적는 글. */
   .far-note { color: var(--muted); font-size: 11px; white-space: nowrap; }
 
+  /* 분기역에서 다른 방면이 나뉘는 자리. 레일에서 비스듬히 뻗는 짧은 선과 방면 이름을 분기역 바로 아래에 둔다. 역 사이로
+     옮겨진 칩이 지나가면 칩이 위에 그려진다. */
+  .branch { position: relative; height: 22px; }
+  .branch::before {
+    content: ""; position: absolute; left: 50%; top: 0; width: 22px; height: 2px;
+    background: var(--rail); transform-origin: 0 50%; transform: rotate(40deg);
+  }
+  .branch-label {
+    position: absolute; left: calc(50% + 20px); top: 7px;
+    border: 0; background: var(--bg); color: var(--muted); padding: 0 4px; border-radius: 4px;
+    font: inherit; font-size: 11px; line-height: 1.4; white-space: nowrap;
+  }
+  button.branch-label { cursor: pointer; text-decoration: underline dashed; text-underline-offset: 2px; }
+
   /* 관심 구간의 끝. 가로 점선이 경계이고, 노선도에서 바로 한 역씩 넓히고 좁히는 버튼을 둔다.
      끝 역과 바깥 역 사이는 열차가 드나들며 지나는 자리라, 버튼은 가운데 역 이름 칸 안에만 위아래로
      쌓아 열차 칸을 비워 둔다. 버튼마다 자기가 다루는 역 쪽에 선다. 쌓임 순서는 레일 세로선보다 위,
@@ -559,6 +573,7 @@ function buildRail(line) {
   };
   const above = rowsOf(layout, 'above');
   const below = rowsOf(layout, 'below');
+  const branches = branchesOf(line);
   const drawn = [...above, ...below].map(i => line.stations[i]).concat(line.stations.slice(range.from, range.to + 1));
   rail.style.setProperty('--name-w', nameWidth(drawn, name => dotsAt(name).length));
 
@@ -594,10 +609,79 @@ function buildRail(line) {
     stop.appendChild(el('div', 'lane down', ''));
     segment.appendChild(stop);
     if (info) segment.appendChild(buildTransferPanel(panelId, info, line));
+    if (branches.has(i)) segment.appendChild(buildBranch(line, branches.get(i)));
   }
   if (!layout.full) appendEdge(rail, line, range, 'below');
   if (below.length > 0) rail.appendChild(buildPeek(line, below, 'below', dotsAt));
   return rail;
+}
+
+/**
+ * 이 뷰의 분기역과 거기서 나뉘는 방면. 역 자리마다 { label, slug } 이고, slug 는 그 방면을 담은 형제 뷰(같은 API 노선의
+ * 다른 뷰)다.
+ *
+ * 형제 뷰의 목록에서 이 뷰에 없는 역이 목록 끝까지 이어지면, 그 앞의 역이 분기역이고 이어지는 첫 역과 끝 역이 방면이다.
+ * 한 역에서 형제 뷰 여럿으로 나뉘면 역이 가장 많은 뷰를 적는다 - 1호선 경인 뷰의 구로는 광명셔틀 뷰(광명)가 아니라
+ * 경부 뷰(신창)다. 형제 뷰가 없는 목록 밖 종착역(경춘선 광운대, 경부 뷰의 서동탄)은 그 열차가 이 뷰를 떠나는 역에 둔다.
+ * 목록 끝 역은 나뉘는 자리가 아니라 목록이 끝나는 자리라 뺀다.
+ */
+function branchesOf(line) {
+  const found = new Map();
+  const last = line.stations.length - 1;
+  const inside = i => line.circular || (i > 0 && i < last);
+  const at = name => line.stations.indexOf(name);
+  for (const sibling of lines) {
+    if (sibling.slug === line.slug || sibling.apiName !== line.apiName) continue;
+    const s = sibling.stations;
+    let first = s.length;
+    while (first > 0 && at(s[first - 1]) < 0) first--;
+    if (first === 0 || first === s.length) continue;
+    const junction = at(s[first - 1]);
+    if (!inside(junction)) continue;
+    const prev = found.get(junction);
+    if (prev && prev.size >= s.length) continue;
+    const end = s[s.length - 1];
+    const label = (s[first] === end ? end : s[first] + ', ' + end) + ' 방면';
+    found.set(junction, { label, slug: sibling.slug, size: s.length });
+  }
+  const siblingStations = new Set(lines.filter(l => l.apiName === line.apiName).flatMap(l => l.stations));
+  for (const [destination, leave] of Object.entries(line.anchors)) {
+    if (siblingStations.has(destination)) continue;
+    const junction = at(leave);
+    if (inside(junction) && !found.has(junction)) found.set(junction, { label: destination + ' 방면', slug: null, size: 0 });
+  }
+  return found;
+}
+
+/** 분기역 아래 줄. 형제 뷰가 있으면 방면 이름을 눌러 그 뷰를 펼친다. */
+function buildBranch(line, branch) {
+  const row = el('div', 'branch');
+  const target = branch.slug && bySlug.get(branch.slug);
+  const label = el(target ? 'button' : 'span', 'branch-label', branch.label);
+  if (target) {
+    label.type = 'button';
+    label.title = target.name + ' 노선을 펼칩니다';
+    label.addEventListener('click', () => showView(target.slug, line));
+  }
+  row.appendChild(label);
+  return row;
+}
+
+/**
+ * 그 뷰를 펼치고 그 자리로 간다. 고른 노선에 없으면 지금 노선 바로 아래에 더한다 - 노선 고르기에서 다시 숨길 수 있다.
+ */
+async function showView(slug, from) {
+  if (!chosenSlugs().includes(slug)) {
+    const list = ownLines();
+    list.splice(list.indexOf(from.slug) + 1, 0, slug);
+    if (!isOpen(slug)) view.open.push(slug);
+    saveView();
+    await renderAll();
+  } else if (!isOpen(slug)) {
+    document.querySelector('.line[data-slug="' + slug + '"] .line-toggle').click();
+  }
+  const section = document.querySelector('.line[data-slug="' + slug + '"]');
+  if (section) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 /**
