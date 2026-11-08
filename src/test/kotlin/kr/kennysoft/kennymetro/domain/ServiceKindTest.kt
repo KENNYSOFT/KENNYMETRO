@@ -31,6 +31,20 @@ class ServiceKindTest : FreeSpec({
         train(gyeongchun, "상봉", "마석")?.service shouldBe ServiceKind.SHORT
     }
 
+    "문산 북쪽 임진강까지 가는 드문 열차는 연장이고 문산행은 두 경의중앙선 뷰 모두 평소 운행이다" {
+        // given - 운천과 임진강은 문산 북쪽의 경의선 역이다. 서울역 쪽 뷰는 평소 종착역을 적지 않으면 목록 끝인
+        // 임진강이 평소 종착역이 되어 문산행이 단축으로 칠해진다.
+        val gyeongui = TestLines.bySlug("gyeongui")
+        val seoul = TestLines.bySlug("gyeongui-seoul")
+
+        // when & then
+        train(gyeongui, "문산", "임진강")?.service shouldBe ServiceKind.EXTENSION
+        train(seoul, "문산", "임진강")?.service shouldBe ServiceKind.EXTENSION
+        train(seoul, "탄현", "문산")?.service shouldBe ServiceKind.NORMAL
+        train(seoul, "운천", "서울역")?.service shouldBe ServiceKind.NORMAL
+        train(gyeongui, "운천", "용문")?.service shouldBe ServiceKind.NORMAL
+    }
+
     "중간에서 돌아가는 열차가 양 끝까지 가는 열차만큼 많으면 그 역도 평소 종착역이다" {
         // given - 7호선은 도봉산과 온수에서, 1호선은 청량리에서, 수인분당선은 죽전, 고색, 오이도에서, 경의중앙선은
         // 덕소에서 돌아가는 열차가 늘 다닌다. 수인분당선 오이도행은 인천과 오이도 사이만 오가는 열차다.
