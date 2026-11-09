@@ -40,6 +40,11 @@
 # 오른쪽 칸에만 둔다. no-service 는 열차가 서지도 지나지도 않는 역이다. 화면은 흐리게 세우고
 # 화살표를 그리지 않으며, 그 바로 옆 역은 목록의 끝 역처럼 열차가 한쪽에서만 들어온다고 본다.
 #
+# up-label 과 down-label 은 노선도 두 칸 위에 적는 방면이고, 그 쪽으로 가는 열차가 닿는 노선의 끝 역을 적는다.
+# 평소 종착역은 한쪽에 여럿일 수 있어(경의중앙선 동쪽의 덕소와 용문) 드물게 가는 끝 역이어도 끝 역을 적는다
+# (경의중앙선 임진강과 지평). 목록 끝 역에서 더 나아가는 열차가 있으면 그 종착역을 슬래시로 잇는다(경춘선
+# 청량리/용산). 순환선은 외선과 내선이다.
+#
 # transfer-file 은 환승 문 파일(transfer/<이름>-doors.csv)의 이름이고 적지 않으면 slug 다.
 # 지선마다 뷰를 둔 노선은 옮겨 온 문서가 하나라 파일 하나를 나눠 쓰고, 뷰마다 자기 역만 가져간다.
 
@@ -363,7 +368,7 @@ metro:
       color: "#77c4a3"
       source: seoul
       transfer-file: gyeongui
-      up-label: 문산
+      up-label: 임진강
       down-label: 지평
       termini: [문산, 덕소, 용문]
       stations: [임진강, 운천, 문산, 파주, 월롱, 금촌, 금릉, 운정, 야당, 탄현, 일산, 풍산, 백마, 곡산,
@@ -379,7 +384,7 @@ metro:
       color: "#77c4a3"
       source: seoul
       transfer-file: gyeongui
-      up-label: 문산
+      up-label: 임진강
       down-label: 서울역
       termini: [문산, 서울역]
       stations: [임진강, 운천, 문산, 파주, 월롱, 금촌, 금릉, 운정, 야당, 탄현, 일산, 풍산, 백마, 곡산,
@@ -393,7 +398,7 @@ metro:
       name: 경춘선
       color: "#0c8e72"
       source: seoul
-      up-label: 청량리
+      up-label: 청량리/용산
       down-label: 춘천
       termini: [상봉, 춘천]
       # ITX-청춘(2000번대)이 전동열차와 섞여 오고 directAt 이 9 다.
