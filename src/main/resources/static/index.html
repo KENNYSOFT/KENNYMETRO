@@ -147,18 +147,19 @@
   .far-note { color: var(--muted); font-size: 11px; white-space: nowrap; }
 
   /* 분기역에서 다른 방면이 나뉘는 자리. 레일에서 비스듬히 뻗는 짧은 선과 방면 이름을 분기역 바로 아래에 둔다. 역 사이로
-     옮겨진 칩이 지나가면 칩이 위에 그려진다. */
-  .branch { position: relative; height: 22px; }
-  .branch::before {
+     옮겨진 칩이 지나가면 칩이 위에 그려진다. 다른 계통 칩이 branch 클래스를 쓰므로 이름을 따로 둔다 - 겹치면 이 선과
+     높이가 그 칩에도 붙는다. */
+  .fork { position: relative; height: 22px; }
+  .fork::before {
     content: ""; position: absolute; left: 50%; top: 0; width: 22px; height: 2px;
     background: var(--rail); transform-origin: 0 50%; transform: rotate(40deg);
   }
-  .branch-label {
+  .fork-label {
     position: absolute; left: calc(50% + 20px); top: 7px;
     border: 0; background: var(--bg); color: var(--muted); padding: 0 4px; border-radius: 4px;
     font: inherit; font-size: 11px; line-height: 1.4; white-space: nowrap;
   }
-  button.branch-label { cursor: pointer; text-decoration: underline dashed; text-underline-offset: 2px; }
+  button.fork-label { cursor: pointer; text-decoration: underline dashed; text-underline-offset: 2px; }
 
   /* 관심 구간의 끝. 가로 점선이 경계이고, 노선도에서 바로 한 역씩 넓히고 좁히는 버튼을 둔다.
      끝 역과 바깥 역 사이는 열차가 드나들며 지나는 자리라, 버튼은 가운데 역 이름 칸 안에만 위아래로
@@ -203,14 +204,20 @@
      물들이면 주황인 직통이 단축과 헷갈린다. */
   .train.ticket { box-shadow: inset 0 0 0 2px var(--kind); }
   .train .tag { font-size: 11px; font-weight: 600; color: var(--warn-fg); }
-  /* 시간표로 자리를 계산한 열차. 운행 범위 표시(배경)와 겹쳐도 읽히도록 글로 적는다. */
-  .train .sched { font-size: 11px; color: var(--muted); }
+  /* 시간표로 자리를 계산한 열차. 칩 바탕과 테두리는 운행 범위가 쓰므로(경부, 경인 뷰의 셔틀은 단축이나 다른 계통이다)
+     칩 안에 테두리만 있는 작은 표로 붙인다. 열차번호와 같은 흐린 글자로 두면 번호와 한 덩어리로 읽혀 보통 열차와
+     구분되지 않는다. 크기는 열차 종류 표와 같다. */
+  .train .sched {
+    align-self: center; border: 1px solid currentColor; color: var(--muted);
+    font-size: 10px; font-weight: 700; line-height: 1; padding: 2px 3px; border-radius: 3px;
+  }
   /* 차수 색은 왼쪽 막대로만 쓴다. 칩 배경을 물들이면 운행 범위 표시와 겹친다. */
   .train.fleet { border-left: 3px solid var(--fleet); padding-left: 5px; }
   .train.short { background: var(--warn-bg); color: var(--warn-fg); font-weight: 600; }
   .train.ext { background: var(--ext-bg); color: var(--ext-fg); font-weight: 600; }
   .train.branch { background: var(--bg); border: 1px dashed var(--muted); padding: 2px 7px; }
   .train.short .no, .train.ext .no { color: inherit; opacity: .7; }
+  .train.short .sched, .train.ext .sched { color: inherit; }
 
   /* 범례. 지금 그려진 열차에 있는 것만 적는다. 나올 수 없는 운행까지 적으면 설명이 아니라 소음이다. */
   .kinds { display: flex; gap: 6px 12px; flex-wrap: wrap; align-items: center; font-size: 12px; color: var(--muted); margin: 0 0 8px; }
@@ -692,9 +699,9 @@ function branchesOf(line) {
 
 /** 분기역 아래 줄. 형제 뷰가 있으면 방면 이름을 눌러 그 뷰를 펼친다. */
 function buildBranch(line, branch) {
-  const row = el('div', 'branch');
+  const row = el('div', 'fork');
   const target = branch.slug && bySlug.get(branch.slug);
-  const label = el(target ? 'button' : 'span', 'branch-label', branch.label);
+  const label = el(target ? 'button' : 'span', 'fork-label', branch.label);
   if (target) {
     label.type = 'button';
     label.title = target.name + ' 노선을 펼칩니다';
