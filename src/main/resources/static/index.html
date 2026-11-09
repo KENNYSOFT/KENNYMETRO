@@ -146,9 +146,10 @@
   /* 끝 너머 몇 역 안에 들어오는 열차가 없을 때 그보다 바깥의 한 대를 적는 글. */
   .far-note { color: var(--muted); font-size: 11px; white-space: nowrap; }
 
-  /* 분기역에서 다른 방면이 나뉘는 자리. 레일에서 비스듬히 뻗는 짧은 선과 방면 이름을 분기역 바로 아래에 두고, 상행 쪽으로
-     나뉘면(경춘선 상봉의 광운대) 바로 위에 두어 선을 위로 뻗는다. 역 사이로 옮겨진 칩이 지나가면 칩이 위에 그려진다. 다른
-     계통 칩이 branch 클래스를 쓰므로 이름을 따로 둔다 - 겹치면 이 선과 높이가 그 칩에도 붙는다. */
+  /* 분기역에서 다른 방면이 나뉘는 자리. 레일에서 비스듬히 뻗는 짧은 선과 방면 이름을 그 방면으로 갈 열차의 칸 쪽에 둔다 -
+     하행 쪽이면 분기역 바로 아래에서 오른쪽(하행 칸)으로, 상행 쪽이면(경춘선 상봉의 광운대) 바로 위에서 왼쪽(상행 칸)으로
+     낸다. 역 사이로 옮겨진 칩이 지나가면 칩이 위에 그려진다. 다른 계통 칩이 branch 클래스를 쓰므로 이름을 따로 둔다 - 겹치면
+     이 선과 높이가 그 칩에도 붙는다. */
   .fork { position: relative; height: 22px; }
   .fork::before {
     content: ""; position: absolute; left: 50%; top: 0; width: 22px; height: 2px;
@@ -160,8 +161,8 @@
     font: inherit; font-size: 11px; line-height: 1.4; white-space: nowrap;
   }
   button.fork-label { cursor: pointer; text-decoration: underline dashed; text-underline-offset: 2px; }
-  .fork.up::before { top: auto; bottom: 0; transform: rotate(-40deg); }
-  .fork.up .fork-label { top: auto; bottom: 7px; }
+  .fork.up::before { left: auto; right: 50%; top: auto; bottom: 0; transform-origin: 100% 50%; }
+  .fork.up .fork-label { left: auto; right: calc(50% + 20px); top: auto; bottom: 7px; }
 
   /* 관심 구간의 끝. 가로 점선이 경계이고, 노선도에서 바로 한 역씩 넓히고 좁히는 버튼을 둔다.
      끝 역과 바깥 역 사이는 열차가 드나들며 지나는 자리라, 버튼은 가운데 역 이름 칸 안에만 위아래로
@@ -709,7 +710,7 @@ function branchesOf(line) {
   return found;
 }
 
-/** 분기역의 곁가지 줄. 상행 쪽으로 나뉘면 선을 위로 뻗는다. 형제 뷰가 있으면 방면 이름을 눌러 그 뷰를 펼친다. */
+/** 분기역의 곁가지 줄. 상행 쪽으로 나뉘면 선을 왼쪽 위로 뻗고 이름을 왼쪽에 적는다. 형제 뷰가 있으면 방면 이름을 눌러 그 뷰를 펼친다. */
 function buildBranch(line, branch) {
   const row = el('div', branch.up ? 'fork up' : 'fork');
   const target = branch.slug && bySlug.get(branch.slug);
