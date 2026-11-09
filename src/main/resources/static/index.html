@@ -146,9 +146,9 @@
   /* 끝 너머 몇 역 안에 들어오는 열차가 없을 때 그보다 바깥의 한 대를 적는 글. */
   .far-note { color: var(--muted); font-size: 11px; white-space: nowrap; }
 
-  /* 분기역에서 다른 방면이 나뉘는 자리. 레일에서 비스듬히 뻗는 짧은 선과 방면 이름을 분기역 바로 아래에 둔다. 역 사이로
-     옮겨진 칩이 지나가면 칩이 위에 그려진다. 다른 계통 칩이 branch 클래스를 쓰므로 이름을 따로 둔다 - 겹치면 이 선과
-     높이가 그 칩에도 붙는다. */
+  /* 분기역에서 다른 방면이 나뉘는 자리. 레일에서 비스듬히 뻗는 짧은 선과 방면 이름을 분기역 바로 아래에 두고, 상행 쪽으로
+     나뉘면(경춘선 상봉의 광운대) 바로 위에 두어 선을 위로 뻗는다. 역 사이로 옮겨진 칩이 지나가면 칩이 위에 그려진다. 다른
+     계통 칩이 branch 클래스를 쓰므로 이름을 따로 둔다 - 겹치면 이 선과 높이가 그 칩에도 붙는다. */
   .fork { position: relative; height: 22px; }
   .fork::before {
     content: ""; position: absolute; left: 50%; top: 0; width: 22px; height: 2px;
@@ -160,6 +160,8 @@
     font: inherit; font-size: 11px; line-height: 1.4; white-space: nowrap;
   }
   button.fork-label { cursor: pointer; text-decoration: underline dashed; text-underline-offset: 2px; }
+  .fork.up::before { top: auto; bottom: 0; transform: rotate(-40deg); }
+  .fork.up .fork-label { top: auto; bottom: 7px; }
 
   /* 관심 구간의 끝. 가로 점선이 경계이고, 노선도에서 바로 한 역씩 넓히고 좁히는 버튼을 둔다.
      끝 역과 바깥 역 사이는 열차가 드나들며 지나는 자리라, 버튼은 가운데 역 이름 칸 안에만 위아래로
@@ -347,7 +349,7 @@
     <li>역과 역 사이에 놓인 열차는 그 역을 떠났거나 들어오는 중입니다.</li>
     <li>흐린 역은 관심 구간 밖이라 구간으로 들어오는 열차만 그립니다.</li>
     <li>밑줄 친 역에서 옆의 동그라미 색 노선으로 갈아탈 수 있습니다. 누르면 환승 문 위치가 타고 온 열차 쪽에 열립니다.</li>
-    <li>역 아래 비스듬한 선은 그 역에서 나뉘는 방면입니다. 밑줄 친 방면을 누르면 그 노선을 펼칩니다.</li>
+    <li>역에서 비스듬히 뻗은 선은 그 역에서 나뉘는 방면입니다. 밑줄 친 방면을 누르면 그 노선을 펼칩니다.</li>
   </ul>
 </header>
 <div class="pick" id="pick" hidden></div>
@@ -651,9 +653,12 @@ function buildRail(line) {
     stop.appendChild(label);
 
     stop.appendChild(el('div', 'lane down', ''));
+    // 곁가지는 나뉘는 쪽에 둔다. 상행 쪽으로 나뉘면 역 위, 나머지는 역과 환승 패널 아래다.
+    const branch = branches.get(i);
+    if (branch && branch.up) segment.appendChild(buildBranch(line, branch));
     segment.appendChild(stop);
     if (info) segment.appendChild(buildTransferPanel(panelId, info, line));
-    if (branches.has(i)) segment.appendChild(buildBranch(line, branches.get(i)));
+    if (branch && !branch.up) segment.appendChild(buildBranch(line, branch));
   }
   if (!layout.full) appendEdge(rail, line, range, 'below');
   if (below.length > 0) rail.appendChild(buildPeek(line, below, 'below', dotsAt));
@@ -661,13 +666,16 @@ function buildRail(line) {
 }
 
 /**
- * 이 뷰의 분기역과 거기서 나뉘는 방면. 역 자리마다 { label, slug } 이고, slug 는 그 방면을 담은 형제 뷰(같은 API 노선의
- * 다른 뷰)다.
+ * 이 뷰의 분기역과 거기서 나뉘는 방면. 역 자리마다 { label, slug, up } 이고, slug 는 그 방면을 담은 형제 뷰(같은 API
+ * 노선의 다른 뷰), up 은 상행 쪽으로 나뉘는지다.
  *
  * 형제 뷰의 목록에서 이 뷰에 없는 역이 목록 끝까지 이어지면, 그 앞의 역이 분기역이고 이어지는 첫 역과 끝 역이 방면이다.
  * 한 역에서 형제 뷰 여럿으로 나뉘면 역이 가장 많은 뷰를 적는다 - 1호선 경인 뷰의 구로는 광명셔틀 뷰(광명)가 아니라
  * 경부 뷰(신창)다. 형제 뷰가 없는 목록 밖 종착역(경춘선 광운대, 경부 뷰의 서동탄)은 그 열차가 이 뷰를 떠나는 역에 둔다.
  * 목록 끝 역은 나뉘는 자리가 아니라 목록이 끝나는 자리라 뺀다.
+ *
+ * 형제 뷰의 방면은 형제 뷰 목록의 뒤쪽에서 나뉘므로 늘 아래로 긋는다. 목록 밖 종착역은 서버가 upAnchors 로 알려 준 것만
+ * 위로 긋는다 - 경춘선 광운대행은 상봉에서 상행 쪽으로 빠진다.
  */
 function branchesOf(line) {
   const found = new Map();
@@ -689,17 +697,21 @@ function branchesOf(line) {
     found.set(junction, { label, slug: sibling.slug, size: s.length });
   }
   const siblingStations = new Set(lines.filter(l => l.apiName === line.apiName).flatMap(l => l.stations));
+  // 화면만 먼저 올리면(scripts/deploy-static.sh) 이전 서버는 upAnchors 를 주지 않는다. 그때는 모두 아래로 긋는다.
+  const upward = line.upAnchors || [];
   for (const [destination, leave] of Object.entries(line.anchors)) {
     if (siblingStations.has(destination)) continue;
     const junction = at(leave);
-    if (inside(junction) && !found.has(junction)) found.set(junction, { label: destination + ' 방면', slug: null, size: 0 });
+    if (inside(junction) && !found.has(junction)) {
+      found.set(junction, { label: destination + ' 방면', slug: null, size: 0, up: upward.includes(destination) });
+    }
   }
   return found;
 }
 
-/** 분기역 아래 줄. 형제 뷰가 있으면 방면 이름을 눌러 그 뷰를 펼친다. */
+/** 분기역의 곁가지 줄. 상행 쪽으로 나뉘면 선을 위로 뻗는다. 형제 뷰가 있으면 방면 이름을 눌러 그 뷰를 펼친다. */
 function buildBranch(line, branch) {
-  const row = el('div', 'fork');
+  const row = el('div', branch.up ? 'fork up' : 'fork');
   const target = branch.slug && bySlug.get(branch.slug);
   const label = el(target ? 'button' : 'span', 'fork-label', branch.label);
   if (target) {

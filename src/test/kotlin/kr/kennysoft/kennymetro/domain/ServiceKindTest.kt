@@ -106,19 +106,21 @@ class ServiceKindTest : FreeSpec({
         onGyeongin?.service shouldBe ServiceKind.BRANCH
     }
 
-    "가장 바깥 종착역을 지나 목록 밖으로 가면 연장이다" {
-        // given - 경춘선 용산행은 청량리를 지나 경의중앙선 선로로 더 간다. 광운대행은 망우에서 옆으로 빠진다.
+    "목록 끝 역을 지나 목록 밖으로 가면 연장이고 목록 중간의 역에서 빠지면 다른 계통이다" {
+        // given - 경춘선 용산행은 목록 끝인 청량리를 지나 경의중앙선 선로로 더 간다. 광운대행은 가장 바깥 평소
+        // 종착역인 상봉에 선 뒤 망우선으로 빠져, 청량리행처럼 중랑으로 가지 않는다.
         val line = TestLines.bySlug("gyeongchun")
 
         // when
         val toYongsan = train(line, "가평", "용산")
-        val toGwangwoon = train(line, "가평", "광운대")
+        val toGwangwoon = train(line, "망우", "광운대")
 
-        // then
+        // then - 상봉에 선 광운대행은 다음 역부터 이 뷰에 없어 그리지 않는다.
         toYongsan?.direction shouldBe Direction.UP
         toYongsan?.service shouldBe ServiceKind.EXTENSION
         toGwangwoon?.direction shouldBe Direction.UP
         toGwangwoon?.service shouldBe ServiceKind.BRANCH
+        train(line, "상봉", "광운대").shouldBeNull()
     }
 
     "끊긴 구간의 끝에서 돌아가는 열차는 평소 운행이다" {

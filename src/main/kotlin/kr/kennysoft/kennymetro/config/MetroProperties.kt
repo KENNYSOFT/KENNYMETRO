@@ -94,6 +94,11 @@ data class LineConfig(
      */
     val beyond: Map<String, String> = emptyMap(),
     /**
+     * `beyond` 가운데 목록 중간의 역에서 up 쪽으로 빠지는 종착역. 화면은 그 분기역의 곁가지 선을 역 위로 긋고,
+     * 적지 않은 종착역은 역 아래로 긋는다. 경춘선 광운대행은 춘천 쪽에서 올라와 상봉에서 망우선으로 빠진다.
+     */
+    val beyondUp: List<String> = emptyList(),
+    /**
      * 열차가 down 쪽으로만 지나는 역. 6호선 응암 순환 구간이 한 방향으로만 돈다. 방면 없이 적힌
      * 환승 문을 화면의 어느 칸에 둘지 정하는 데 쓴다.
      */

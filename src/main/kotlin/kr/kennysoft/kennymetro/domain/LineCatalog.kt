@@ -141,16 +141,19 @@ class LineCatalog(properties: MetroProperties) {
         val bounds = focus.map { indexOrFail(it, "focus") }.sorted()
 
         val ends = termini.ifEmpty { listOf(stations.first(), stations.last()) }
-        val endIndices = ends.map { indexOrFail(it, "termini") }
+        ends.forEach { indexOrFail(it, "termini") }
         val anchors = beyond.map { (destination, via) ->
             require(destination.isNotBlank()) { "$slug: beyond 의 키가 비었다. 키를 대괄호로 감쌌는지 볼 것: $beyond" }
             require(destination !in stations) { "$slug: beyond 의 $destination 은 이미 목록에 있는 역이다" }
             val at = indexOrFail(via, "beyond")
-            // 가장 바깥 종착역에서 더 나아가면 연장이고, 그 안쪽에서 옆으로 빠지면 다른 계통이다.
-            // 서동탄행은 병점이 평소 종착역이어도 신창 쪽이 아니라 옆으로 빠지므로 다른 계통이다.
-            val service = if (at <= endIndices.min() || at >= endIndices.max()) ServiceKind.EXTENSION else ServiceKind.BRANCH
+            // 목록 끝 역에서 더 나아가면 연장이고, 목록 중간의 역에서 옆으로 빠지면 다른 계통이다. 서동탄행은 병점이
+            // 평소 종착역이어도 신창 쪽이 아니라 옆으로 빠진다. 경춘선 광운대행은 가장 바깥 평소 종착역인 상봉에서
+            // 빠지지만 청량리행처럼 목록을 따라 중랑으로 가지 않는다.
+            val service = if (at == 0 || at == stations.lastIndex) ServiceKind.EXTENSION else ServiceKind.BRANCH
             destination to Destination(at, service)
         }.toMap()
+        // 곁가지 선을 위로 그을 종착역이라 beyond 에 적은 것이어야 한다. 오타로 빠지면 선이 반대쪽으로 그어진다.
+        beyondUp.forEach { require(it in beyond) { "$slug: beyond-up 의 $it 이 beyond 에 없다" } }
 
         return Line(
             slug = slug,
@@ -170,6 +173,7 @@ class LineCatalog(properties: MetroProperties) {
             fleet = fleet?.toFleet(slug),
             termini = ends.toSet(),
             anchors = anchors,
+            upAnchors = beyondUp.toSet(),
             downOnly = downOnly.toSet(),
             noService = noService.toSet(),
             foreignTrainPrefixes = foreignTrainPrefixes,

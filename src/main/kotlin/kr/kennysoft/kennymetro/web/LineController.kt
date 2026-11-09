@@ -51,6 +51,7 @@ class LineController(
         live = source != LineSource.NONE,
         extraDestinations = ArrayList(anchors.keys),
         anchors = LinkedHashMap(anchors.mapValues { (_, destination) -> stations[destination.index] }),
+        upAnchors = ArrayList(upAnchors),
         downOnly = ArrayList(downOnly),
         noService = ArrayList(noService),
     )
@@ -96,6 +97,8 @@ data class LineView(
      * 갈라진다. 화면은 관심 구간 끝 너머의 열차가 끝 역까지 오는지 이것으로 가린다.
      */
     val anchors: Map<String, String>,
+    /** `anchors` 가운데 목록 중간의 역에서 up 쪽으로 빠지는 종착역. 화면은 그 분기역의 곁가지 선을 역 위로 긋는다. */
+    val upAnchors: List<String>,
     /** 열차가 down 쪽으로만 지나는 역. 화면은 그 역의 왼쪽 화살표를 그리지 않는다. */
     val downOnly: List<String>,
     /** 열차가 서지도 지나지도 않는 역. 화면은 흐리게 세우고 화살표를 그리지 않는다. */

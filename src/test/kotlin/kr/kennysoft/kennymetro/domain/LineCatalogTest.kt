@@ -413,4 +413,40 @@ class LineCatalogTest : FreeSpec({
         shouldThrow<IllegalArgumentException> { catalogWith(TrainKindConfig(color = "#f7941d", separateTicket = true)) }
             .message shouldContain "note"
     }
+
+    "목록 중간의 역에서 up 쪽으로 빠지는 목록 밖 종착역을 노선에 싣는다" {
+        // given - 경춘선 광운대행은 춘천 쪽에서 올라와 상봉에 선 뒤 망우선으로 빠진다. 화면이 곁가지 선을 상봉 위로 긋는다.
+        val gyeongchun = TestLines.bySlug("gyeongchun")
+        val gyeongbu = TestLines.bySlug("line1-gyeongbu")
+
+        // when & then - 서동탄행은 병점에서 아래로 빠진다.
+        gyeongchun.anchors["광운대"]?.index shouldBe gyeongchun.indexOf("상봉")
+        gyeongchun.upAnchors shouldBe setOf("광운대")
+        gyeongbu.upAnchors.shouldBeEmpty()
+    }
+
+    "beyond-up 에 beyond 에 없는 종착역을 적으면 기동이 실패한다" {
+        // given - 곁가지 선을 위로 그을 종착역이다. 오타로 빠지면 선이 반대쪽으로 그어진다.
+        val broken = MetroProperties(
+            listOf(
+                LineConfig(
+                    slug = "test",
+                    name = "테스트선",
+                    color = "#000000",
+                    source = LineSource.SEOUL,
+                    upLabel = "위",
+                    downLabel = "아래",
+                    stations = listOf("가", "나", "다"),
+                    beyond = mapOf("라" to "나"),
+                    beyondUp = listOf("마"),
+                )
+            )
+        )
+
+        // when
+        val error = shouldThrow<IllegalArgumentException> { LineCatalog(broken) }
+
+        // then - 어느 설정이 틀렸는지 알려야 한다.
+        error.message shouldContain "beyond-up"
+    }
 })

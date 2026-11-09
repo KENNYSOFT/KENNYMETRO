@@ -80,6 +80,14 @@ data class Line(
      */
     val anchors: Map<String, Destination>,
     /**
+     * `anchors` 가운데 lines.yml 의 beyond-up 으로 적은, 목록 중간의 역에서 up 쪽으로 빠지는 종착역.
+     *
+     * <p>
+     * 화면은 분기역의 곁가지 선을 이 종착역이면 역 위로, 나머지는 역 아래로 긋는다. 경춘선 광운대행은 춘천 쪽에서
+     * 올라와 상봉에 선 뒤 망우선으로 빠진다.
+     */
+    val upAnchors: Set<String>,
+    /**
      * 열차가 down 쪽으로만 지나는 역.
      *
      * <p>

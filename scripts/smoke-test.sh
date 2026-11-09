@@ -168,6 +168,13 @@ views = {line["slug"]: line for line in json.loads(sys.stdin.buffer.read().decod
 anchors = views["line1-gyeongbu"]["anchors"]
 sys.exit(0 if anchors.get("인천") == "구로" and anchors.get("서동탄") == "병점" else 1)
 ' || fail "경부 뷰의 갈라지는 역이 응답에 없다: $LINES"
+# 목록 중간의 역에서 상행 쪽으로 빠지는 목록 밖 종착역. 응답에 없으면 화면이 경춘선 광운대 곁가지를 상봉 아래로 긋는다.
+echo "$LINES" | python3 -c '
+import json, sys
+views = {line["slug"]: line for line in json.loads(sys.stdin.buffer.read().decode("utf-8"))["lines"]}
+line = views["gyeongchun"]
+sys.exit(0 if line["anchors"].get("광운대") == "상봉" and line.get("upAnchors") == ["광운대"] else 1)
+' || fail "경춘선 광운대가 상봉에서 상행 쪽으로 빠진다는 것이 응답에 없다: $LINES"
 # 열차 종류의 색과 설명. 화면이 열차의 kind 를 이것으로 그리므로 빠지면 ITX-청춘과 직통이 보통 열차처럼 보인다.
 echo "$LINES" | python3 -c '
 import json, sys
